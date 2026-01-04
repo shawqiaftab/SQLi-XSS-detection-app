@@ -12,8 +12,3 @@ matplotlib
 seaborn
 plotly
 torch-geometric
-pyg-lib
-torch-scatter
-torch-sparse
-torch-cluster
-torch-spline-conv
