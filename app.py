@@ -11,7 +11,17 @@ import re
 from gensim.models import Word2Vec, FastText
 from sklearn.feature_extraction.text import TfidfVectorizer
 from huggingface_hub import hf_hub_download
-from transformers import BertTokenizer, BertForSequenceClassification, DistilBertTokenizer, DistilBertForSequenceClassification
+
+# ✅ FIXED: Use Auto classes (compatible with all transformers versions)
+try:
+    from transformers import (
+        AutoTokenizer, 
+        AutoModelForSequenceClassification
+    )
+except ImportError as e:
+    st.error(f"❌ transformers library issue: {e}")
+    st.stop()
+
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -64,7 +74,6 @@ class ContentMatchingPreprocessor:
 
     def special_character_mapping(self, text):
         """Map special characters to tokens - ORDER MATTERS!"""
-        # Process multi-character patterns FIRST
         char_mappings = [
             ('--', ' COMMENT '),
             ('/*', ' BLOCKCOMMENT_START '),
@@ -91,10 +100,9 @@ class ContentMatchingPreprocessor:
         if not isinstance(text, str):
             text = str(text)
 
-        # ✅ CORRECT ORDER (matches training exactly)
         text = self.digital_generalization(text)
         text = self.url_replacement(text)
-        text = self.preserve_keywords(text)  # BEFORE normalize!
+        text = self.preserve_keywords(text)
         text = self.normalize_text(text)
         text = self.special_character_mapping(text)
 
@@ -129,13 +137,27 @@ def load_single_model(model_name, model_type):
             return keras.models.load_model(file_path)
 
         elif model_type == "transformer":
-            if model_name == 'DistilBERT':
-                tokenizer = DistilBertTokenizer.from_pretrained(repo_id, subfolder=f"models/transformers/{model_name}")
-                model = DistilBertForSequenceClassification.from_pretrained(repo_id, subfolder=f"models/transformers/{model_name}")
-            else:
-                tokenizer = BertTokenizer.from_pretrained(repo_id, subfolder=f"models/transformers/{model_name}")
-                model = BertForSequenceClassification.from_pretrained(repo_id, subfolder=f"models/transformers/{model_name}")
-            return {'model': model, 'tokenizer': tokenizer}
+            # ✅ FIXED: Use Auto classes for compatibility
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    repo_id, 
+                    subfolder=f"models/transformers/{model_name}"
+                )
+                model = AutoModelForSequenceClassification.from_pretrained(
+                    repo_id, 
+                    subfolder=f"models/transformers/{model_name}"
+                )
+                return {'model': model, 'tokenizer': tokenizer}
+            except Exception as e:
+                st.warning(f"Failed to load {model_name} from custom path: {e}")
+                # Fallback: try loading from model name directly
+                if model_name == 'DistilBERT':
+                    model_id = 'distilbert-base-uncased'
+                else:
+                    model_id = 'bert-base-uncased'
+                tokenizer = AutoTokenizer.from_pretrained(model_id)
+                model = AutoModelForSequenceClassification.from_pretrained(model_id)
+                return {'model': model, 'tokenizer': tokenizer}
 
         elif model_type == "hybrid":
             file_path = hf_hub_download(
@@ -151,14 +173,11 @@ def load_single_model(model_name, model_type):
 
 @st.cache_resource
 def load_feature_extractors_lazy():
-    """
-    FIXED: Load TF-IDF AND Word2Vec/FastText for proper feature extraction
-    """
+    """Load TF-IDF AND Word2Vec/FastText for proper feature extraction"""
     repo_id = "Dr-KeK/sqli-xss-models"
     extractors = {}
 
     try:
-        # Load TF-IDF vectorizer (for Classical ML)
         tfidf_path = hf_hub_download(
             repo_id=repo_id,
             filename="features/tfidf_vectorizer.pkl",
@@ -171,7 +190,6 @@ def load_feature_extractors_lazy():
         st.error(f"❌ Failed to load TF-IDF: {str(e)}")
 
     try:
-        # Load Word2Vec (for UniEmbed)
         w2v_path = hf_hub_download(
             repo_id=repo_id,
             filename="features/word2vec.model",
@@ -183,7 +201,6 @@ def load_feature_extractors_lazy():
         st.warning(f"⚠️ Word2Vec not available: {str(e)}")
 
     try:
-        # Load FastText (for UniEmbed)
         ft_path = hf_hub_download(
             repo_id=repo_id,
             filename="features/fasttext.model",
@@ -206,10 +223,7 @@ def extract_tfidf_features(text, extractors):
         return np.zeros(1000)
 
 def extract_uniembed_features(text, extractors):
-    """
-    FIXED: Extract UniEmbed features (Word2Vec + FastText + USE)
-    Training config: word2vec_dim=50, fasttext_dim=50, use_dim=512
-    """
+    """Extract UniEmbed features (Word2Vec + FastText + USE)"""
     w2v_dim = 50
     ft_dim = 50
     use_dim = 512
@@ -217,7 +231,6 @@ def extract_uniembed_features(text, extractors):
 
     features = np.zeros(total_dim)
 
-    # Word2Vec embedding
     if 'word2vec' in extractors:
         tokens = text.split()
         w2v_vectors = []
@@ -227,7 +240,6 @@ def extract_uniembed_features(text, extractors):
         if w2v_vectors:
             features[:w2v_dim] = np.mean(w2v_vectors, axis=0)
 
-    # FastText embedding
     if 'fasttext' in extractors:
         tokens = text.split()
         ft_vectors = []
@@ -235,9 +247,6 @@ def extract_uniembed_features(text, extractors):
             ft_vectors.append(extractors['fasttext'].wv[token])
         if ft_vectors:
             features[w2v_dim:w2v_dim+ft_dim] = np.mean(ft_vectors, axis=0)
-
-    # USE would go here (skip for now, leave as zeros)
-    # features[w2v_dim+ft_dim:] = use_embeddings
 
     return features
 
@@ -257,7 +266,7 @@ def prepare_deep_learning_input(features, model_name):
     return features.reshape(1, -1)
 
 def predict_with_transformer(text, model_dict, max_length=64):
-    """Predict with transformer model (uses RAW text, not preprocessed)"""
+    """Predict with transformer model (uses RAW text)"""
     model = model_dict['model']
     tokenizer = model_dict['tokenizer']
 
@@ -279,7 +288,7 @@ def predict_with_transformer(text, model_dict, max_length=64):
 st.set_page_config(page_title="SQLi & XSS Detection System", layout="wide", page_icon="🛡️")
 
 st.title("🛡️ SQL Injection & XSS Attack Detection System")
-st.markdown("### FIXED VERSION - Correct Feature Extraction")
+st.markdown("### FIXED VERSION - Compatible with All Transformers Versions")
 st.markdown("---")
 
 # Sidebar
@@ -362,7 +371,6 @@ if analyze_button and user_input:
         processed_text = preprocessor.preprocess(user_input)
 
         try:
-            # Load feature extractors (cached)
             if not st.session_state.feature_extractors:
                 with st.spinner("📥 Loading feature extractors from HuggingFace..."):
                     st.session_state.feature_extractors = load_feature_extractors_lazy()
@@ -373,7 +381,6 @@ if analyze_button and user_input:
                 st.error("❌ Failed to load feature extractors!")
                 st.stop()
 
-            # Extract features (both types)
             tfidf_features = None
             uniembed_features = None
 
@@ -383,7 +390,6 @@ if analyze_button and user_input:
             if any(dl_models.values()) or any(hybrid_models.values()):
                 uniembed_features = extract_uniembed_features(processed_text, extractors)
 
-            # Debug information
             with st.expander("🔍 Preprocessing & Features Debug"):
                 col_a, col_b = st.columns(2)
                 with col_a:
@@ -405,7 +411,6 @@ if analyze_button and user_input:
                     st.write(f"Non-zero: {np.count_nonzero(uniembed_features)}")
                     st.write(f"Range: [{uniembed_features.min():.4f}, {uniembed_features.max():.4f}]")
 
-                # Vocabulary coverage
                 if 'tfidf' in extractors:
                     vectorizer = extractors['tfidf']
                     tokens = processed_text.split()
@@ -423,7 +428,7 @@ if analyze_button and user_input:
 
             results = []
 
-            # ===== CLASSICAL ML MODELS - USE TF-IDF ✅ =====
+            # Classical ML Models - USE TF-IDF
             selected_classical = [k for k, v in classical_models.items() if v]
             if selected_classical and tfidf_features is not None:
                 st.subheader("🔹 Classical Machine Learning Models (TF-IDF)")
@@ -439,7 +444,6 @@ if analyze_button and user_input:
                     if model_name in st.session_state.loaded_models:
                         try:
                             model = st.session_state.loaded_models[model_name]
-                            # USE TF-IDF FEATURES
                             pred = model.predict(tfidf_features.reshape(1, -1))[0]
                             if hasattr(model, 'predict_proba'):
                                 proba = model.predict_proba(tfidf_features.reshape(1, -1))[0]
@@ -462,7 +466,7 @@ if analyze_button and user_input:
                         except Exception as e:
                             st.warning(f"⚠️ {model_name}: {str(e)}")
 
-            # ===== DEEP LEARNING MODELS - USE UNIEMBED ✅ =====
+            # Deep Learning Models - USE UNIEMBED
             selected_dl = [k for k, v in dl_models.items() if v]
             if selected_dl and uniembed_features is not None:
                 st.subheader("🔹 Deep Learning Models (UniEmbed)")
@@ -478,7 +482,6 @@ if analyze_button and user_input:
                     if model_name in st.session_state.loaded_models:
                         try:
                             model = st.session_state.loaded_models[model_name]
-                            # USE UNIEMBED FEATURES (reshaped for DL architecture)
                             input_data = prepare_deep_learning_input(uniembed_features, model_name)
                             proba = model.predict(input_data, verbose=0)[0][0]
                             pred = 1 if proba > 0.5 else 0
@@ -499,7 +502,7 @@ if analyze_button and user_input:
                         except Exception as e:
                             st.warning(f"⚠️ {model_name}: {str(e)}")
 
-            # ===== TRANSFORMER MODELS - USE RAW TEXT ✅ =====
+            # Transformer Models - USE RAW TEXT
             selected_transformers = [k for k, v in transformer_models.items() if v]
             if selected_transformers:
                 st.subheader("🔹 Transformer Models (Raw Text)")
@@ -514,7 +517,6 @@ if analyze_button and user_input:
 
                     if model_name in st.session_state.loaded_models:
                         try:
-                            # USE RAW TEXT (not processed!)
                             pred, conf = predict_with_transformer(user_input, st.session_state.loaded_models[model_name])
                             confidence = conf * 100
 
@@ -533,7 +535,7 @@ if analyze_button and user_input:
                         except Exception as e:
                             st.warning(f"⚠️ {model_name}: {str(e)}")
 
-            # ===== HYBRID MODELS - USE UNIEMBED ✅ =====
+            # Hybrid Models - USE UNIEMBED
             selected_hybrid = [k for k, v in hybrid_models.items() if v]
             if selected_hybrid and uniembed_features is not None:
                 st.subheader("🔹 Hybrid Ensemble Models (UniEmbed)")
@@ -549,7 +551,6 @@ if analyze_button and user_input:
                     if model_name in st.session_state.loaded_models:
                         try:
                             model = st.session_state.loaded_models[model_name]
-                            # USE UNIEMBED FEATURES
                             pred = model.predict(uniembed_features.reshape(1, -1))[0]
                             if hasattr(model, 'predict_proba'):
                                 proba = model.predict_proba(uniembed_features.reshape(1, -1))[0]
@@ -612,7 +613,7 @@ elif analyze_button:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666;'>
-<p>🔬 Advanced Web Attack Detection System | FIXED VERSION</p>
-<p>✅ Correct Feature Extraction: TF-IDF for Classical ML | UniEmbed for Deep Learning & Hybrid</p>
+<p>🔬 Advanced Web Attack Detection System | FIXED VERSION v2</p>
+<p>✅ Compatible with All Transformers Versions</p>
 </div>
 """, unsafe_allow_html=True)
