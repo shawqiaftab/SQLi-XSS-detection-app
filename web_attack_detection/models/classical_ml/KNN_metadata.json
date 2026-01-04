@@ -1,8 +1,0 @@
-{
-  "model_name": "KNN",
-  "training_time": 0.08724665641784668,
-  "training_samples": 122047,
-  "n_features": 1000,
-  "n_features_in": 1000,
-  "feature_type": "tfidf"
-}

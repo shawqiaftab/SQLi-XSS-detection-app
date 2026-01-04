@@ -1,9 +1,0 @@
-{
-  "model_name": "Random_Forest",
-  "training_time": 26.877276182174683,
-  "training_samples": 122047,
-  "n_features": 1000,
-  "n_features_in": 1000,
-  "has_feature_importance": true,
-  "feature_type": "tfidf"
-}

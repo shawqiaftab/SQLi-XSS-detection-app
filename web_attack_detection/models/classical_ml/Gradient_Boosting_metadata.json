@@ -1,9 +1,0 @@
-{
-  "model_name": "Gradient_Boosting",
-  "training_time": 1581.0250511169434,
-  "training_samples": 122047,
-  "n_features": 1000,
-  "n_features_in": 1000,
-  "has_feature_importance": true,
-  "feature_type": "tfidf"
-}

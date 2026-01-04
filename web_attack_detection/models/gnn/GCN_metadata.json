@@ -1,7 +1,0 @@
-{
-  "model_name": "GCN",
-  "training_time": 1035.1386427879333,
-  "total_parameters": 17826,
-  "best_val_accuracy": 0.9816666666666667,
-  "input_dim": 57
-}

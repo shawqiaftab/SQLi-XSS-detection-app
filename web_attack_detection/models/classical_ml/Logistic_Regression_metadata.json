@@ -1,8 +1,0 @@
-{
-  "model_name": "Logistic_Regression",
-  "training_time": 4.479003429412842,
-  "training_samples": 122047,
-  "n_features": 1000,
-  "n_features_in": 1000,
-  "feature_type": "tfidf"
-}
