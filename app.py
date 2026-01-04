@@ -8,9 +8,7 @@ from tensorflow import keras
 import torch
 from pathlib import Path
 import re
-from gensim.models import Word2Vec, FastText
 from sklearn.feature_extraction.text import TfidfVectorizer
-from transformers import BertTokenizer, BertForSequenceClassification, DistilBertTokenizer, DistilBertForSequenceClassification
 from huggingface_hub import hf_hub_download
 import warnings
 warnings.filterwarnings('ignore')
@@ -120,47 +118,33 @@ def load_single_model(model_name, model_type):
 
 @st.cache_resource
 def load_feature_extractors_lazy():
-    """Load feature extractors on demand"""
+    """Load TF-IDF vectorizer"""
     repo_id = "Dr-KeK/sqli-xss-models"
     extractors = {}
     
     try:
-        # Word2Vec
-        w2v_path = hf_hub_download(repo_id=repo_id, filename="features/word2vec.model", repo_type="model")
-        extractors['word2vec'] = Word2Vec.load(w2v_path)
-        
-        # FastText
-        ft_path = hf_hub_download(repo_id=repo_id, filename="features/fasttext.model", repo_type="model")
-        extractors['fasttext'] = FastText.load(ft_path)
-        
-        # TF-IDF
-        tfidf_path = hf_hub_download(repo_id=repo_id, filename="features/tfidf_vectorizer.pkl", repo_type="model")
+        # Load TF-IDF vectorizer
+        tfidf_path = hf_hub_download(
+            repo_id=repo_id, 
+            filename="features/tfidf_vectorizer.pkl", 
+            repo_type="model"
+        )
         with open(tfidf_path, 'rb') as f:
             extractors['tfidf'] = pickle.load(f)
+        st.success("✅ Loaded TF-IDF vectorizer")
     except Exception as e:
-        st.warning(f"Could not load some features: {str(e)}")
+        st.error(f"❌ Failed to load TF-IDF: {str(e)}")
     
     return extractors
 
-def extract_uniembed_features(text, extractors, w2v_dim=50, ft_dim=50):
-    """Extract UniEmbed features for a single text"""
-    tokens = text.split()
-
-    # Word2Vec
-    w2v_vectors = []
-    for token in tokens:
-        if 'word2vec' in extractors and token in extractors['word2vec'].wv:
-            w2v_vectors.append(extractors['word2vec'].wv[token])
-    w2v_emb = np.mean(w2v_vectors, axis=0) if w2v_vectors else np.zeros(w2v_dim)
-
-    # FastText
-    ft_vectors = []
-    for token in tokens:
-        if 'fasttext' in extractors:
-            ft_vectors.append(extractors['fasttext'].wv[token])
-    ft_emb = np.mean(ft_vectors, axis=0) if ft_vectors else np.zeros(ft_dim)
-
-    return np.concatenate([w2v_emb, ft_emb])
+def extract_features(text, extractors):
+    """Extract features using TF-IDF"""
+    if 'tfidf' in extractors:
+        features = extractors['tfidf'].transform([text]).toarray()[0]
+        return features
+    else:
+        st.error("❌ No feature extractors available!")
+        return np.zeros(1000)
 
 def prepare_deep_learning_input(features, model_name):
     """Reshape features for deep learning models"""
@@ -181,7 +165,7 @@ def prepare_deep_learning_input(features, model_name):
 st.set_page_config(page_title="SQLi & XSS Detection System", layout="wide", page_icon="🛡️")
 
 st.title("🛡️ SQL Injection & XSS Attack Detection System")
-st.markdown("### Lightweight Version - Select Models to Use")
+st.markdown("### Memory-Optimized Version - Select Models to Use")
 st.markdown("---")
 
 # Sidebar
@@ -253,11 +237,18 @@ if analyze_button and user_input:
         try:
             # Load feature extractors
             if not st.session_state.feature_extractors:
-                with st.spinner("Loading feature extractors..."):
+                with st.spinner("📥 Loading TF-IDF vectorizer..."):
                     st.session_state.feature_extractors = load_feature_extractors_lazy()
             
             extractors = st.session_state.feature_extractors
-            uniembed_features = extract_uniembed_features(processed_text, extractors)
+            
+            if not extractors:
+                st.error("❌ Failed to load feature extractors!")
+                st.stop()
+            
+            # Extract features
+            features = extract_features(processed_text, extractors)
+            st.info(f"📊 Feature vector size: {features.shape[0]} dimensions")
 
             with st.expander("🔍 Preprocessed Text"):
                 col_a, col_b = st.columns(2)
@@ -289,9 +280,9 @@ if analyze_button and user_input:
                         if model_name in st.session_state.loaded_models:
                             try:
                                 model = st.session_state.loaded_models[model_name]
-                                pred = model.predict(uniembed_features.reshape(1, -1))[0]
+                                pred = model.predict(features.reshape(1, -1))[0]
                                 if hasattr(model, 'predict_proba'):
-                                    proba = model.predict_proba(uniembed_features.reshape(1, -1))[0]
+                                    proba = model.predict_proba(features.reshape(1, -1))[0]
                                     confidence = proba[pred] * 100
                                 else:
                                     confidence = 100 if pred == 1 else 0
@@ -327,7 +318,7 @@ if analyze_button and user_input:
                         if model_name in st.session_state.loaded_models:
                             try:
                                 model = st.session_state.loaded_models[model_name]
-                                input_data = prepare_deep_learning_input(uniembed_features, model_name)
+                                input_data = prepare_deep_learning_input(features, model_name)
                                 proba = model.predict(input_data, verbose=0)[0][0]
                                 pred = 1 if proba > 0.5 else 0
                                 confidence = proba * 100 if pred == 1 else (1 - proba) * 100
@@ -363,9 +354,9 @@ if analyze_button and user_input:
                         if model_name in st.session_state.loaded_models:
                             try:
                                 model = st.session_state.loaded_models[model_name]
-                                pred = model.predict(uniembed_features.reshape(1, -1))[0]
+                                pred = model.predict(features.reshape(1, -1))[0]
                                 if hasattr(model, 'predict_proba'):
-                                    proba = model.predict_proba(uniembed_features.reshape(1, -1))[0]
+                                    proba = model.predict_proba(features.reshape(1, -1))[0]
                                     confidence = proba[pred] * 100
                                 else:
                                     confidence = 100 if pred == 1 else 0
@@ -426,6 +417,6 @@ st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666;'>
     <p>🔬 Advanced Web Attack Detection System | Memory-Optimized Version</p>
-    <p>Select models in sidebar • Models load on-demand from HuggingFace</p>
+    <p>Models load on-demand from HuggingFace • TF-IDF Feature Extraction</p>
 </div>
 """, unsafe_allow_html=True)
