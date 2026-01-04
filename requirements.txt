@@ -12,3 +12,4 @@ matplotlib
 seaborn
 plotly
 torch-geometric
+huggingface-hub
