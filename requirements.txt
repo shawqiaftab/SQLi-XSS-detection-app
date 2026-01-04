@@ -1,0 +1,11 @@
+streamlit
+numpy
+pandas
+scikit-learn
+tensorflow
+torch
+transformers
+gensim
+xgboost
+lightgbm
+joblib
