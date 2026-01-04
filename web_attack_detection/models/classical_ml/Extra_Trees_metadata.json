@@ -1,0 +1,9 @@
+{
+  "model_name": "Extra_Trees",
+  "training_time": 32.76280355453491,
+  "training_samples": 122047,
+  "n_features": 1000,
+  "n_features_in": 1000,
+  "has_feature_importance": true,
+  "feature_type": "tfidf"
+}

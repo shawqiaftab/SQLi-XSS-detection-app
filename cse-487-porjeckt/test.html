@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Framework - Compact</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            width: 100%;
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 5px;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 15px;
+            font-size: 11px;
+        }
+        
+        .framework {
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            gap: 10px;
+            flex-wrap: nowrap;
+        }
+        
+        .stage {
+            flex: 1;
+            min-width: 200px;
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+        
+        .stage:hover {
+            transform: translateY(-3px);
+        }
+        
+        .stage-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid;
+        }
+        
+        .stage-icon {
+            font-size: 20px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+        }
+        
+        .stage-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #2d3748;
+            line-height: 1.2;
+        }
+        
+        .stage-content {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .item {
+            background: #f7fafc;
+            padding: 8px 10px;
+            border-radius: 6px;
+            border-left: 3px solid;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+        
+        .item-title {
+            font-weight: 600;
+            margin-bottom: 2px;
+            color: #2d3748;
+        }
+        
+        .item-subtitle {
+            font-size: 9px;
+            color: #718096;
+        }
+        
+        /* Color schemes */
+        .stage1 { border: 2px solid #3182ce; }
+        .stage1 .stage-header { border-color: #3182ce; }
+        .stage1 .stage-icon { color: #3182ce; background: #ebf8ff; }
+        .stage1 .item { border-color: #3182ce; }
+        
+        .stage2 { border: 2px solid #38a169; }
+        .stage2 .stage-header { border-color: #38a169; }
+        .stage2 .stage-icon { color: #38a169; background: #f0fff4; }
+        .stage2 .item { border-color: #38a169; }
+        
+        .stage3 { border: 2px solid #d69e2e; }
+        .stage3 .stage-header { border-color: #d69e2e; }
+        .stage3 .stage-icon { color: #d69e2e; background: #fffff0; }
+        .stage3 .item { border-color: #d69e2e; }
+        
+        .stage4 { border: 2px solid #dd6b20; }
+        .stage4 .stage-header { border-color: #dd6b20; }
+        .stage4 .stage-icon { color: #dd6b20; background: #fffaf0; }
+        .stage4 .item { border-color: #dd6b20; }
+        
+        .stage5 { border: 2px solid #9f7aea; }
+        .stage5 .stage-header { border-color: #9f7aea; }
+        .stage5 .stage-icon { color: #9f7aea; background: #faf5ff; }
+        .stage5 .item { border-color: #9f7aea; }
+        
+        .stage6 { border: 2px solid #ed64a6; }
+        .stage6 .stage-header { border-color: #ed64a6; }
+        .stage6 .stage-icon { color: #ed64a6; background: #fff5f7; }
+        .stage6 .item { border-color: #ed64a6; }
+        
+        .arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 38px; /* Slightly larger for wider look */
+            min-width: 35px; /* Wider */
+            background: linear-gradient(to right, #3182ce, #2d3748); /* Blue to Black gradient */
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold; /* Make the arrow bolder */
+        }
+        
+        .annotation {
+            background: #4299e1;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 10px;
+            font-weight: 600;
+            display: inline-block;
+            margin: 10px auto;
+        }
+        
+        .model-tier {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 6px 8px;
+            border-radius: 5px;
+            margin-bottom: 6px;
+            font-size: 9px;
+            line-height: 1.4;
+        }
+        
+        .tier-label {
+            font-weight: 700;
+            display: block;
+            margin-bottom: 2px;
+            font-size: 10px;
+        }
+        
+        .caption {
+            text-align: center;
+            margin-top: 15px;
+            padding-top: 12px;
+            border-top: 2px solid #e2e8f0;
+            color: #718096;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 SQL Injection & XSS Detection Framework with GNN Integration</h1>
+        <p class="subtitle">Comparative study across 32 machine learning architectures</p>
+        
+        <div style="text-align: center;">
+            <span class="annotation">📊 70% Train / 15% Val / 15% Test</span>
+        </div>
+        
+        <div class="framework">
+            <div class="stage stage1">
+                <div class="stage-header">
+                    <div class="stage-icon"><i class="fas fa-database"></i></div>
+                    <div class="stage-title">Data<br>Acquisition</div>
+                </div>
+                <div class="stage-content">
+                    <div class="item">
+                        <div class="item-title">📄 XSS Dataset</div>
+                        <div class="item-subtitle">3 columns</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🎯 SQL Train</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">✅ SQL Test</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🔧 SQL Validation</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">⚡ Modified SQL</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">→</div>
+            
+            <div class="stage stage2">
+                <div class="stage-header">
+                    <div class="stage-icon"><i class="fas fa-filter"></i></div>
+                    <div class="stage-title">Pre-<br>processing</div>
+                </div>
+                <div class="stage-content">
+                    <div class="item">
+                        <div class="item-title">🔍 Duplicate Detect</div>
+                        <div class="item-subtitle">SHA-256 (13 removed)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🧹 Null Handling</div>
+                        <div class="item-subtitle">39 labels processed</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">📋 Schema Std</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🔤 Encoding Norm</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🕸️ Graph Build</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">→</div>
+            
+            <div class="stage stage3">
+                <div class="stage-header">
+                    <div class="stage-icon"><i class="fas fa-cogs"></i></div>
+                    <div class="stage-title">Feature<br>Engineering</div>
+                </div>
+                <div class="stage-content">
+                    <div class="item">
+                        <div class="item-title">🎨 UniEmbed 612D</div>
+                        <div class="item-subtitle">W2V(50)+FT(50)+USE(512)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">📊 TF-IDF 1000D</div>
+                        <div class="item-subtitle">n-gram (1,2)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🤖 Transformer 768D</div>
+                        <div class="item-subtitle">BERT/RoBERTa/DistilBERT</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🔗 Hybrid 712D</div>
+                        <div class="item-subtitle">UniEmbed+Top100 TF-IDF</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🌐 Graph Features</div>
+                        <div class="item-subtitle">Node(64D)+Edges+Pos</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">→</div>
+            
+            <div class="stage stage4">
+                <div class="stage-header">
+                    <div class="stage-icon"><i class="fas fa-brain"></i></div>
+                    <div class="stage-title">Model<br>Training</div>
+                </div>
+                <div class="stage-content">
+                    <div class="model-tier">
+                        <span class="tier-label">🥉 Classical ML (9)</span>
+                        LR,SVM,GNB,DT,KNN,RF,XGB,GB,ET
+                    </div>
+                    <div class="model-tier">
+                        <span class="tier-label">🥈 DNN (7)</span>
+                        MLP,CNN,LSTM,BiLSTM,CNN-LSTM,GRU
+                    </div>
+                    <div class="model-tier">
+                        <span class="tier-label">🥇 Transformers (5)</span>
+                        BERT,DistilBERT,RoBERTa,ELECTRA
+                    </div>
+                    <div class="model-tier">
+                        <span class="tier-label">💎 Hybrid (5)</span>
+                        Stacking,Voting,LightGBM-BiLSTM
+                    </div>
+                    <div class="model-tier">
+                        <span class="tier-label">⭐ GNN (6)</span>
+                        GCN,GAT,GraphSAGE,GT,GGNN
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">→</div>
+            
+            <div class="stage stage5">
+                <div class="stage-header">
+                    <div class="stage-icon"><i class="fas fa-chart-line"></i></div>
+                    <div class="stage-title">Evaluation</div>
+                </div>
+                <div class="stage-content">
+                    <div class="item">
+                        <div class="item-title">📈 Classification</div>
+                        <div class="item-subtitle">Acc,Prec,Rec,F1,MCC,AUC</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🕸️ Graph Metrics</div>
+                        <div class="item-subtitle">Coverage,Density,Entropy</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">⚡ Computational</div>
+                        <div class="item-subtitle">Time,Memory,Speed</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">📊 Statistical</div>
+                        <div class="item-subtitle">McNemar's (p<0.05)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🎯 Embed Quality</div>
+                        <div class="item-subtitle">Silhouette,Clustering</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">→</div>
+            
+            <div class="stage stage6">
+                <div class="stage-header">
+                    <div class="stage-icon"><i class="fas fa-microscope"></i></div>
+                    <div class="stage-title">Results<br>Analysis</div>
+                </div>
+                <div class="stage-content">
+                    <div class="item">
+                        <div class="item-title">📊 Performance</div>
+                        <div class="item-subtitle">32-model comparison</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🔍 LIME</div>
+                        <div class="item-subtitle">Feature importance</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🌐 GNNExplainer</div>
+                        <div class="item-subtitle">Subgraph analysis</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">🏆 Optimal Model</div>
+                        <div class="item-subtitle">Deployment selection</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-title">📄 Error Analysis</div>
+                        <div class="item-subtitle">Failure patterns</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="caption">
+            <i class="fas fa-info-circle"></i> <strong>Figure 1:</strong> System architecture for comparative SQL injection and XSS detection framework
+        </div>
+    </div>
+</body>
+</html>

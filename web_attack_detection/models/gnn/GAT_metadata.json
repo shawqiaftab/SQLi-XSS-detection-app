@@ -1,0 +1,7 @@
+{
+  "model_name": "GAT",
+  "training_time": 11077.046474218369,
+  "total_parameters": 603810,
+  "best_val_accuracy": 0.9925,
+  "input_dim": 57
+}

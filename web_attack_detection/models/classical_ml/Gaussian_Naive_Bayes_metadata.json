@@ -1,0 +1,8 @@
+{
+  "model_name": "Gaussian_Naive_Bayes",
+  "training_time": 1.544497013092041,
+  "training_samples": 122047,
+  "n_features": 1000,
+  "n_features_in": 1000,
+  "feature_type": "tfidf"
+}

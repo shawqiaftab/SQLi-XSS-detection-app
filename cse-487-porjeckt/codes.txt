@@ -1,0 +1,4779 @@
+# ============================================================================
+# FILE: config.py
+# DESCRIPTION: Memory-optimized configuration for Google Colab
+# ============================================================================
+
+import os
+import random
+import numpy as np
+import tensorflow as tf
+import torch
+from pathlib import Path
+import gc
+
+# ============================================================================
+# GLOBAL CONFIGURATION (COLAB OPTIMIZED)
+# ============================================================================
+
+GLOBAL_CONFIG = {
+    # ========== PATHS ==========
+    'base_dir': '/content/web_attack_detection',
+    'data_dir': '/content',
+    'models_dir': '/content/web_attack_detection/models',
+    'results_dir': '/content/web_attack_detection/results',
+    'viz_dir': '/content/web_attack_detection/visualizations',
+    'logs_dir': '/content/web_attack_detection/logs',
+    
+    # ========== DATA SPLIT ==========
+    'train_split': 0.70,
+    'val_split': 0.15,
+    'test_split': 0.15,
+    'random_seed': 42,
+    'stratify': True,
+    
+    # ========== MEMORY OPTIMIZATION ==========
+    'use_sample_data': False,
+    'sample_fraction': 0.3,
+    'max_samples': 50000,
+    'clear_memory_after_model': True,
+    'use_chunked_processing': True,
+    'chunk_size': 5000,
+    
+    # ========== TRAINING PARAMETERS (REDUCED) ==========
+    'batch_size': 32,
+    'epochs': 20,
+    'early_stopping_patience': 5,
+    'early_stopping_metric': 'val_loss',
+    'learning_rate': 0.001,
+    'optimizer': 'adam',
+    'loss_function': 'binary_crossentropy',
+    
+    # ========== REGULARIZATION ==========
+    'dropout_rate': 0.3,
+    'l2_regularization': 0.01,
+    
+    # ========== CLASSICAL ML ==========
+    'cv_folds': 3,
+    'max_iter': 500,
+    'n_jobs': 2,
+    
+    # ========== TRANSFORMER MODELS (HIGHLY REDUCED) ==========
+    'max_seq_length': 128,
+    'transformer_epochs': 3,
+    'transformer_lr': 2e-5,
+    'transformer_batch_size': 8,
+    'warmup_ratio': 0.1,
+    'gradient_accumulation_steps': 4,
+    
+    # ========== FEATURE EXTRACTION (REDUCED) ==========
+    'word2vec_dim': 50,
+    'fasttext_dim': 50,
+    'use_dim': 512,
+    'skip_use': False,
+    'skip_bert': True,
+    'skip_hybrid': True,
+    'tfidf_max_features': 1000,
+    'tfidf_ngram_range': (1, 2),
+    
+    # ========== GNN PARAMETERS (REDUCED) ==========
+    'node_feature_dim': 64,
+    'gnn_hidden_dims': [64, 32, 16],
+    'gnn_layers': 3,
+    'gnn_dropout': 0.3,
+    'gat_heads': 4,
+    'gnn_epochs': 15,
+    'gnn_lr': 0.001,
+    'gnn_batch_size': 32,
+    
+    # ========== HARDWARE ==========
+    'use_gpu': True,
+    'mixed_precision': True,
+    'num_workers': 2,
+    'pin_memory': False,
+    
+    # ========== SAMPLE COLLECTION ==========
+    'samples_per_category': 20,
+    'save_lime_explanations': False,
+    'lime_samples': 5,
+    
+    # ========== SELECTIVE MODEL TRAINING ==========
+    'train_classical_ml': True,
+    'train_deep_learning': True,
+    'train_transformers': False,
+    'train_gnn': False,
+    'train_hybrid': True,
+}
+
+# ============================================================================
+# MODEL ARCHITECTURE SPECIFICATIONS (REDUCED)
+# ============================================================================
+
+MODEL_ARCHITECTURES = {
+    'MLP': {
+        'layers': [256, 128, 64],
+        'activations': ['relu', 'relu', 'relu'],
+        'dropout': 0.3,
+    },
+    'CNN': {
+        'conv_layers': [
+            {'filters': 16, 'kernel_size': 3},
+            {'filters': 32, 'kernel_size': 3},
+        ],
+        'pool_size': 2,
+        'dense_units': 64,
+        'dropout': 0.3,
+    },
+    'BiLSTM': {
+        'lstm_units': [64, 32],
+        'bidirectional': True,
+        'return_sequences': [True, False],
+        'dense_units': 64,
+        'dropout': 0.3,
+    },
+    'CNN_LSTM': {
+        'conv_layers': [
+            {'filters': 32, 'kernel_size': 3},
+            {'filters': 64, 'kernel_size': 3},
+        ],
+        'pool_size': 2,
+        'lstm_units': 64,
+        'dense_units': 32,
+        'dropout': 0.3,
+    },
+}
+
+# ============================================================================
+# EVALUATION METRICS
+# ============================================================================
+
+PRIMARY_METRICS = [
+    'accuracy', 'precision', 'recall', 'f1_score', 'roc_auc',
+    'pr_auc', 'fpr', 'fnr', 'fp_count', 'fn_count', 'tp', 'tn', 'mcc'
+]
+
+TIMING_METRICS = [
+    'training_time', 'inference_time_per_sample',
+    'total_inference_time', 'throughput'
+]
+
+COMPUTATIONAL_METRICS = [
+    'model_parameters', 'model_size_mb',
+    'gpu_memory_mb', 'cpu_memory_mb'
+]
+
+# ============================================================================
+# MODEL LISTS (PRIORITY ORDERED)
+# ============================================================================
+
+ESSENTIAL_MODELS = [
+    'Logistic_Regression', 'Random_Forest', 'XGBoost'
+]
+
+CLASSICAL_ML_MODELS = [
+    'Logistic_Regression', 'SVM', 'Gaussian_Naive_Bayes',
+    'Decision_Tree', 'KNN', 'Random_Forest', 'XGBoost',
+    'Gradient_Boosting', 'Extra_Trees'
+]
+
+DEEP_LEARNING_MODELS = [
+    'MLP', 'CNN', 'LSTM', 'BiLSTM', 'CNN_LSTM'
+]
+
+TRANSFORMER_MODELS = [
+    'DistilBERT', 'BERT'
+]
+
+HYBRID_MODELS = [
+    'Stacking_Ensemble', 'Soft_Voting', 'Hard_Voting'
+]
+
+GNN_MODELS = [
+    'GCN', 'GAT'
+]
+
+ALL_MODELS = (CLASSICAL_ML_MODELS + DEEP_LEARNING_MODELS + 
+              TRANSFORMER_MODELS + HYBRID_MODELS + GNN_MODELS)
+
+# ============================================================================
+# MEMORY MANAGEMENT FUNCTIONS
+# ============================================================================
+
+def clear_memory():
+    """Aggressive memory clearing"""
+    gc.collect()
+    
+    try:
+        tf.keras.backend.clear_session()
+    except:
+        pass
+    
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
+def get_memory_usage():
+    """Get current memory usage"""
+    import psutil
+    process = psutil.Process()
+    mem_info = process.memory_info()
+    mem_gb = mem_info.rss / 1024**3
+    return mem_gb
+
+def print_memory_status():
+    """Print current memory status"""
+    try:
+        mem_gb = get_memory_usage()
+        print(f"Current memory usage: {mem_gb:.2f} GB")
+        
+        if torch.cuda.is_available():
+            gpu_mem = torch.cuda.memory_allocated() / 1024**3
+            gpu_max = torch.cuda.max_memory_allocated() / 1024**3
+            print(f"GPU memory: {gpu_mem:.2f} GB (max: {gpu_max:.2f} GB)")
+    except:
+        pass
+
+# ============================================================================
+# SETUP FUNCTIONS
+# ============================================================================
+
+def set_seed(seed=42):
+    """Set random seeds for reproducibility"""
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    
+    if torch.cuda.is_available():
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+def create_directory_structure():
+    """Create all necessary directories"""
+    directories = [
+        GLOBAL_CONFIG['base_dir'],
+        GLOBAL_CONFIG['models_dir'],
+        GLOBAL_CONFIG['results_dir'],
+        GLOBAL_CONFIG['viz_dir'],
+        GLOBAL_CONFIG['logs_dir'],
+        
+        f"{GLOBAL_CONFIG['models_dir']}/classical_ml",
+        f"{GLOBAL_CONFIG['models_dir']}/deep_learning",
+        f"{GLOBAL_CONFIG['models_dir']}/transformers",
+        f"{GLOBAL_CONFIG['models_dir']}/hybrid",
+        f"{GLOBAL_CONFIG['models_dir']}/gnn",
+        
+        f"{GLOBAL_CONFIG['results_dir']}/metrics",
+        f"{GLOBAL_CONFIG['results_dir']}/predictions",
+        f"{GLOBAL_CONFIG['results_dir']}/sample_outputs",
+        f"{GLOBAL_CONFIG['results_dir']}/error_analysis",
+        
+        f"{GLOBAL_CONFIG['viz_dir']}/individual_models",
+        f"{GLOBAL_CONFIG['viz_dir']}/comparative",
+        
+        f"{GLOBAL_CONFIG['logs_dir']}/training_logs",
+    ]
+    
+    for directory in directories:
+        Path(directory).mkdir(parents=True, exist_ok=True)
+    
+    print("Directory structure created successfully!")
+    return directories
+
+def check_gpu():
+    """Check GPU availability"""
+    print("\n" + "="*70)
+    print("GPU AVAILABILITY CHECK")
+    print("="*70)
+    
+    print("\n TensorFlow:")
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        for gpu in gpus:
+            print(f"Found GPU: {gpu}")
+        try:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            print("  Memory growth enabled")
+        except RuntimeError as e:
+            print(f"  Warning: {e}")
+    else:
+        print("  No GPU found, using CPU")
+    
+    print("\n PyTorch:")
+    if torch.cuda.is_available():
+        print(f"   CUDA available: {torch.cuda.get_device_name(0)}")
+        print(f"  CUDA version: {torch.version.cuda}")
+        print(f"   Number of GPUs: {torch.cuda.device_count()}")
+    else:
+        print("   CUDA not available, using CPU")
+    
+    print("="*70 + "\n")
+    print_memory_status()
+
+def optimize_for_colab():
+    """Apply Colab-specific optimizations"""
+    print("\nApplying Colab optimizations...")
+    
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
+    
+    print("Colab optimizations applied!")
+
+# ============================================================================
+# INITIALIZATION
+# ============================================================================
+
+if __name__ == "__main__":
+    print("="*70)
+    print("INITIALIZING PROJECT CONFIGURATION (COLAB OPTIMIZED)")
+    print("="*70)
+    
+    set_seed(GLOBAL_CONFIG['random_seed'])
+    create_directory_structure()
+    optimize_for_colab()
+    check_gpu()
+    
+    print("\nConfiguration initialized successfully!")
+    print(f"Base directory: {GLOBAL_CONFIG['base_dir']}")
+    print(f"Random seed: {GLOBAL_CONFIG['random_seed']}")
+    print(f"\nMemory settings:")
+    print(f"  - Sample data: {GLOBAL_CONFIG['use_sample_data']}")
+    print(f"  - Batch size: {GLOBAL_CONFIG['batch_size']}")
+    print(f"  - TF-IDF features: {GLOBAL_CONFIG['tfidf_max_features']}")
+    print(f"  - Epochs: {GLOBAL_CONFIG['epochs']}")
+
+
+# ============================================================================
+# FILE: data_preprocessing.py
+# DESCRIPTION: Data loading, cleaning, and preprocessing (MEMORY OPTIMIZED)
+# ============================================================================
+
+from config import GLOBAL_CONFIG
+
+import pandas as pd
+import numpy as np
+import re
+from sklearn.model_selection import train_test_split
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from nltk.tokenize import word_tokenize
+import warnings
+import gc
+warnings.filterwarnings('ignore')
+
+# ============================================================================
+# SQL/XSS KEYWORDS AND PATTERNS
+# ============================================================================
+
+SQL_KEYWORDS = [
+    'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER',
+    'UNION', 'WHERE', 'FROM', 'JOIN', 'AND', 'OR', 'NOT', 'NULL',
+    'ORDER', 'GROUP', 'HAVING', 'LIMIT', 'OFFSET', 'AS', 'ON',
+    'EXEC', 'EXECUTE', 'DECLARE', 'TABLE', 'DATABASE', 'COLUMN',
+    'BETWEEN', 'LIKE', 'IN', 'EXISTS', 'CASE', 'WHEN', 'THEN',
+    'DISTINCT', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX'
+]
+
+XSS_KEYWORDS = [
+    'script', 'iframe', 'object', 'embed', 'applet', 'meta', 'link',
+    'style', 'img', 'svg', 'video', 'audio', 'canvas', 'input',
+    'button', 'form', 'body', 'html', 'onerror', 'onload', 'onclick',
+    'onmouseover', 'onfocus', 'onblur', 'alert', 'prompt', 'confirm',
+    'eval', 'expression', 'javascript', 'vbscript', 'document',
+    'window', 'location', 'cookie', 'localstorage', 'sessionstorage'
+]
+
+# ============================================================================
+# PREPROCESSING FUNCTIONS
+# ============================================================================
+
+class ContentMatchingPreprocessor:
+    """Implements content matching preprocessing"""
+    
+    def __init__(self):
+        self.sql_keywords = set([kw.lower() for kw in SQL_KEYWORDS])
+        self.xss_keywords = set([kw.lower() for kw in XSS_KEYWORDS])
+        self.stemmer = PorterStemmer()
+        self.stop_words = set(stopwords.words('english'))
+        
+    def digital_generalization(self, text):
+        """Replace numbers with <NUM> token"""
+        return re.sub(r'\b\d+\b', '<NUM>', text)
+    
+    def url_replacement(self, text):
+        """Replace URLs with <URL> token"""
+        url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+        return re.sub(url_pattern, '<URL>', text)
+    
+    def preserve_keywords(self, text):
+        """Preserve SQL and XSS keywords as atomic units"""
+        for keyword in self.sql_keywords:
+            pattern = re.compile(r'\b' + re.escape(keyword) + r'\b', re.IGNORECASE)
+            text = pattern.sub(f'<SQL_{keyword.upper()}>', text)
+        
+        for keyword in self.xss_keywords:
+            pattern = re.compile(r'\b' + re.escape(keyword) + r'\b', re.IGNORECASE)
+            text = pattern.sub(f'<XSS_{keyword.upper()}>', text)
+        
+        return text
+    
+    def normalize_text(self, text):
+        """Lowercase and remove excessive whitespace"""
+        text = text.lower()
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
+    
+    def special_character_mapping(self, text):
+        """Map special characters to tokens"""
+        char_mappings = {
+            '\'': '<SQUOTE>',
+            '"': '<DQUOTE>',
+            ';': '<SEMICOLON>',
+            '--': '<COMMENT>',
+            '/*': '<BLOCKCOMMENT_START>',
+            '*/': '<BLOCKCOMMENT_END>',
+            '=': '<EQUALS>',
+            '<': '<LT>',
+            '>': '<GT>',
+            '(': '<LPAREN>',
+            ')': '<RPAREN>',
+            '{': '<LBRACE>',
+            '}': '<RBRACE>',
+            '[': '<LBRACKET>',
+            ']': '<RBRACKET>',
+        }
+        
+        for char, token in char_mappings.items():
+            text = text.replace(char, f' {token} ')
+        
+        return text
+    
+    def preprocess(self, text, apply_stemming=False, remove_stopwords=False):
+        """Complete preprocessing pipeline"""
+        if not isinstance(text, str):
+            text = str(text)
+        
+        text = self.digital_generalization(text)
+        text = self.url_replacement(text)
+        text = self.preserve_keywords(text)
+        text = self.normalize_text(text)
+        text = self.special_character_mapping(text)
+        
+        if apply_stemming or remove_stopwords:
+            tokens = word_tokenize(text)
+            
+            if remove_stopwords:
+                tokens = [t for t in tokens if t not in self.stop_words]
+            
+            if apply_stemming:
+                tokens = [self.stemmer.stem(t) for t in tokens]
+            
+            text = ' '.join(tokens)
+        
+        return text
+
+# ============================================================================
+# DATA LOADING AND MERGING
+# ============================================================================
+
+class DataLoader:
+    """Load and merge all datasets with memory optimization"""
+    
+    def __init__(self, data_dir='/content', config=None):
+        self.data_dir = data_dir
+        self.preprocessor = ContentMatchingPreprocessor()
+        if config is None:
+            config = GLOBAL_CONFIG
+        self.config = config
+        
+    def load_dataset(self, filename, text_col=None, label_col='Label'):
+        """Load a single dataset"""
+        filepath = f"{self.data_dir}/{filename}"
+        print(f"Loading {filename}...")
+        
+        try:
+            df = pd.read_csv(filepath, engine='python')
+            
+            if text_col is None:
+                text_cols = ['Sentence', 'Query', 'text', 'Text', 'payload', 'Payload']
+                for col in text_cols:
+                    if col in df.columns:
+                        text_col = col
+                        break
+                
+                if text_col is None:
+                    text_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
+            
+            df = df.rename(columns={text_col: 'text', label_col: 'label'})
+            
+            if 'text' in df.columns and 'label' in df.columns:
+                df = df[['text', 'label']]
+            
+            df = df.dropna(subset=['label'])
+            df['text'] = df['text'].fillna('')
+            df['label'] = df['label'].astype(int)
+            
+            print(f"  Loaded {len(df)} samples")
+            print(f"  Label distribution: {df['label'].value_counts().to_dict()}")
+            
+            return df
+        
+        except Exception as e:
+            print(f"  Error loading {filename}: {str(e)}")
+            return None
+    
+    def load_all_datasets(self):
+        """Load all datasets and merge them"""
+        print("\n" + "="*70)
+        print("LOADING ALL DATASETS")
+        print("="*70 + "\n")
+        
+        datasets = {}
+        
+        xss_df = self.load_dataset('XSS_dataset.csv', text_col='Sentence')
+        if xss_df is not None:
+            xss_df['dataset_source'] = 'xss'
+            datasets['xss'] = xss_df
+        
+        train_df = self.load_dataset('Train.csv', text_col='Query')
+        if train_df is not None:
+            train_df['dataset_source'] = 'sql_train'
+            datasets['sql_train'] = train_df
+        
+        test_df = self.load_dataset('Test.csv', text_col='Query')
+        if test_df is not None:
+            test_df['dataset_source'] = 'sql_test'
+            datasets['sql_test'] = test_df
+        
+        val_df = self.load_dataset('Validation.csv', text_col='Query')
+        if val_df is not None:
+            val_df['dataset_source'] = 'sql_val'
+            datasets['sql_val'] = val_df
+        
+        modified_sql_df = self.load_dataset('Modified_SQL_Dataset.csv', text_col='Query')
+        if modified_sql_df is not None:
+            modified_sql_df['dataset_source'] = 'sql_modified'
+            datasets['sql_modified'] = modified_sql_df
+        
+        print("\n" + "="*70)
+        print("MERGING DATASETS")
+        print("="*70 + "\n")
+        
+        all_dfs = [df for df in datasets.values() if df is not None]
+        
+        if not all_dfs:
+            raise ValueError("No datasets were loaded successfully!")
+        
+        merged_df = pd.concat(all_dfs, ignore_index=True)
+        
+        print(f"Total samples: {len(merged_df)}")
+        print(f"Total features: {merged_df.shape[1]}")
+        print(f"Label distribution:")
+        print(merged_df['label'].value_counts())
+        print(f"\nDataset sources:")
+        print(merged_df['dataset_source'].value_counts())
+        
+        duplicates = merged_df.duplicated(subset=['text', 'label']).sum()
+        print(f"\nChecking for duplicates...")
+        print(f"  Found {duplicates} duplicate rows")
+        
+        if duplicates > 0:
+            merged_df = merged_df.drop_duplicates(subset=['text', 'label'], keep='first')
+            print(f"  Removed duplicates, {len(merged_df)} samples remaining")
+        
+        # MEMORY OPTIMIZATION: Apply sampling if configured
+        if self.config.get('use_sample_data', False):
+            sample_fraction = self.config.get('sample_fraction', 0.3)
+            max_samples = self.config.get('max_samples', 50000)
+            
+            target_size = int(len(merged_df) * sample_fraction)
+            target_size = min(target_size, max_samples)
+            
+            print(f"\nUSING SAMPLE DATA FOR MEMORY OPTIMIZATION")
+            print(f"  Original size: {len(merged_df)}")
+            print(f"  Sample size: {target_size}")
+            
+            merged_df = merged_df.sample(n=target_size, random_state=self.config['random_seed'])
+            print(f"  Sampled dataset: {len(merged_df)} samples\n")
+        
+        return merged_df, datasets
+    
+    def preprocess_data(self, df, apply_stemming=False, remove_stopwords=False):
+        """Apply content matching preprocessing to all text"""
+        print("\n" + "="*70)
+        print("PREPROCESSING DATA (Content Matching)")
+        print("="*70 + "\n")
+        
+        df = df.copy()
+        df['text_original'] = df['text']
+        
+        print("Applying content matching preprocessing...")
+        df['text'] = df['text'].apply(
+            lambda x: self.preprocessor.preprocess(
+                x, 
+                apply_stemming=apply_stemming,
+                remove_stopwords=remove_stopwords
+            )
+        )
+        
+        print("Preprocessing complete!")
+        
+        print("\nExample transformations:")
+        for i in range(min(3, len(df))):
+            print(f"\n  Original: {df['text_original'].iloc[i][:100]}...")
+            print(f"  Processed: {df['text'].iloc[i][:100]}...")
+        
+        return df
+    
+    def create_splits(self, df, config=None):
+        """Create train/val/test splits with stratification"""
+        if config is None:
+            config = self.config
+            
+        print("\n" + "="*70)
+        print("CREATING DATA SPLITS")
+        print("="*70 + "\n")
+        
+        X = df['text'].values
+        y = df['label'].values
+        
+        X_train, X_temp, y_train, y_temp = train_test_split(
+            X, y,
+            test_size=(config['val_split'] + config['test_split']),
+            random_state=config['random_seed'],
+            stratify=y if config['stratify'] else None
+        )
+        
+        val_ratio = config['val_split'] / (config['val_split'] + config['test_split'])
+        X_val, X_test, y_val, y_test = train_test_split(
+            X_temp, y_temp,
+            test_size=(1 - val_ratio),
+            random_state=config['random_seed'],
+            stratify=y_temp if config['stratify'] else None
+        )
+        
+        print(f"Train set: {len(X_train)} samples ({len(X_train)/len(X)*100:.1f}%)")
+        print(f"   Class distribution: {np.bincount(y_train)}")
+        print(f"\nValidation set: {len(X_val)} samples ({len(X_val)/len(X)*100:.1f}%)")
+        print(f"   Class distribution: {np.bincount(y_val)}")
+        print(f"\nTest set: {len(X_test)} samples ({len(X_test)/len(X)*100:.1f}%)")
+        print(f"   Class distribution: {np.bincount(y_test)}")
+        
+        splits = {
+            'X_train': X_train, 'y_train': y_train,
+            'X_val': X_val, 'y_val': y_val,
+            'X_test': X_test, 'y_test': y_test
+        }
+        
+        return splits
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    from config import GLOBAL_CONFIG, set_seed
+    from pathlib import Path
+    
+    set_seed(GLOBAL_CONFIG['random_seed'])
+    
+    loader = DataLoader(data_dir=GLOBAL_CONFIG['data_dir'], config=GLOBAL_CONFIG)
+    merged_df, individual_datasets = loader.load_all_datasets()
+    
+    processed_df = loader.preprocess_data(merged_df)
+    
+    splits = loader.create_splits(processed_df)
+    
+    print("\nSaving processed data...")
+    save_dir = f"{GLOBAL_CONFIG['base_dir']}/data"
+    Path(save_dir).mkdir(parents=True, exist_ok=True)
+    
+    np.save(f"{save_dir}/X_train.npy", splits['X_train'])
+    np.save(f"{save_dir}/y_train.npy", splits['y_train'])
+    np.save(f"{save_dir}/X_val.npy", splits['X_val'])
+    np.save(f"{save_dir}/y_val.npy", splits['y_val'])
+    np.save(f"{save_dir}/X_test.npy", splits['X_test'])
+    np.save(f"{save_dir}/y_test.npy", splits['y_test'])
+    
+    processed_df.to_csv(f"{save_dir}/processed_data.csv", index=False)
+    
+    print("Data preprocessing complete!")
+
+
+# ============================================================================
+# FILE: 09_evaluation.py
+# DESCRIPTION: Comprehensive model evaluation
+# ============================================================================
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score,
+    roc_auc_score, average_precision_score, confusion_matrix,
+    matthews_corrcoef, classification_report
+)
+import time
+import json
+from pathlib import Path
+import joblib
+import tensorflow as tf
+import torch
+from config import GLOBAL_CONFIG, set_seed, CLASSICAL_ML_MODELS, DEEP_LEARNING_MODELS, TRANSFORMER_MODELS
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+# ============================================================================
+# COMPREHENSIVE EVALUATOR
+# ============================================================================
+
+class ComprehensiveEvaluator:
+    """Evaluate all models with comprehensive metrics"""
+    
+    def __init__(self, config=GLOBAL_CONFIG):
+        self.config = config
+        
+    def compute_all_metrics(self, y_true, y_pred, y_pred_proba=None):
+        """
+        Compute all evaluation metrics
+        
+        Returns:
+            Dictionary with all metrics
+        """
+        # Confusion matrix
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+        
+        # Basic metrics
+        accuracy = accuracy_score(y_true, y_pred)
+        precision = precision_score(y_true, y_pred, zero_division=0)
+        recall = recall_score(y_true, y_pred, zero_division=0)
+        f1 = f1_score(y_true, y_pred, zero_division=0)
+        mcc = matthews_corrcoef(y_true, y_pred)
+        
+        # False rates
+        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+        fnr = fn / (fn + tp) if (fn + tp) > 0 else 0
+        
+        metrics = {
+            'accuracy': float(accuracy),
+            'precision': float(precision),
+            'recall': float(recall),
+            'f1_score': float(f1),
+            'mcc': float(mcc),
+            'tp': int(tp),
+            'tn': int(tn),
+            'fp': int(fp),
+            'fn': int(fn),
+            'fpr': float(fpr),
+            'fnr': float(fnr),
+        }
+        
+        # ROC-AUC and PR-AUC (require probabilities)
+        if y_pred_proba is not None:
+            try:
+                # If 2D, take positive class probabilities
+                if len(y_pred_proba.shape) > 1 and y_pred_proba.shape[1] == 2:
+                    y_scores = y_pred_proba[:, 1]
+                else:
+                    y_scores = y_pred_proba
+                
+                roc_auc = roc_auc_score(y_true, y_scores)
+                pr_auc = average_precision_score(y_true, y_scores)
+                
+                metrics['roc_auc'] = float(roc_auc)
+                metrics['pr_auc'] = float(pr_auc)
+            except:
+                metrics['roc_auc'] = None
+                metrics['pr_auc'] = None
+        else:
+            metrics['roc_auc'] = None
+            metrics['pr_auc'] = None
+        
+        return metrics
+    
+    def evaluate_classical_ml(self, model_name, X_test, y_test):
+        """Evaluate classical ML model"""
+        print(f"\n Evaluating {model_name}...")
+        
+        # Load model
+        model_path = f"{self.config['models_dir']}/classical_ml/{model_name}.pkl"
+        model = joblib.load(model_path)
+        
+        # Predictions
+        start_time = time.time()
+        y_pred = model.predict(X_test)
+        inference_time = time.time() - start_time
+        
+        # Probabilities
+        if hasattr(model, 'predict_proba'):
+            y_pred_proba = model.predict_proba(X_test)
+        else:
+            y_pred_proba = None
+        
+        # Compute metrics
+        metrics = self.compute_all_metrics(y_test, y_pred, y_pred_proba)
+        
+        # Timing metrics
+        metrics['total_inference_time'] = float(inference_time)
+        metrics['inference_time_per_sample'] = float(inference_time / len(X_test) * 1000)  # ms
+        metrics['throughput'] = float(len(X_test) / inference_time)  # samples/sec
+        
+        print(f"   Accuracy: {metrics['accuracy']:.4f}")
+        print(f"   F1-Score: {metrics['f1_score']:.4f}")
+        print(f"   Inference time: {metrics['inference_time_per_sample']:.2f} ms/sample")
+        
+        return metrics, y_pred, y_pred_proba
+    
+    def evaluate_deep_learning(self, model_name, X_test, y_test):
+        """Evaluate deep learning model"""
+        print(f"\n Evaluating {model_name}...")
+        
+        # Load model
+        model_path = f"{self.config['models_dir']}/deep_learning/{model_name}.h5"
+        model = tf.keras.models.load_model(model_path)
+        
+        # Prepare data
+        if model_name == 'CNN':
+            X_test_prepared = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
+        elif model_name in ['RNN', 'LSTM', 'BiLSTM', 'CNN_LSTM', 'CNN_RNN']:
+            n_features = X_test.shape[1]
+            timesteps = min(n_features, 50)
+            features_per_timestep = n_features // timesteps
+            truncated_features = timesteps * features_per_timestep
+            X_test_truncated = X_test[:, :truncated_features]
+            X_test_prepared = X_test_truncated.reshape(X_test.shape[0], timesteps, features_per_timestep)
+        else:
+            X_test_prepared = X_test
+        
+        # Predictions
+        start_time = time.time()
+        y_pred_proba = model.predict(X_test_prepared, verbose=0)
+        inference_time = time.time() - start_time
+        
+        y_pred = (y_pred_proba > 0.5).astype(int).flatten()
+        
+        # Compute metrics
+        metrics = self.compute_all_metrics(y_test, y_pred, y_pred_proba)
+        
+        # Timing metrics
+        metrics['total_inference_time'] = float(inference_time)
+        metrics['inference_time_per_sample'] = float(inference_time / len(X_test) * 1000)
+        metrics['throughput'] = float(len(X_test) / inference_time)
+        
+        # Model size
+        metrics['model_parameters'] = int(model.count_params())
+        
+        print(f"   Accuracy: {metrics['accuracy']:.4f}")
+        print(f"   F1-Score: {metrics['f1_score']:.4f}")
+        print(f"   Parameters: {metrics['model_parameters']:,}")
+        
+        return metrics, y_pred, y_pred_proba
+    
+    def evaluate_transformer(self, model_name, X_test_text, y_test):
+        """Evaluate transformer model"""
+        print(f"\n Evaluating {model_name}...")
+        
+        
+        
+        # Load model and tokenizer
+        model_dir = f"{self.config['models_dir']}/transformers/{model_name}"
+        tokenizer = AutoTokenizer.from_pretrained(model_dir)
+        model = AutoModelForSequenceClassification.from_pretrained(model_dir)
+        
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model.to(device)
+        model.eval()
+        
+        # Predictions
+        y_pred = []
+        y_pred_proba = []
+        
+        batch_size = 32
+        start_time = time.time()
+        
+        with torch.no_grad():
+            for i in range(0, len(X_test_text), batch_size):
+                batch_texts = list(X_test_text[i:i+batch_size])
+                
+                encoded = tokenizer(
+                    batch_texts,
+                    padding=True,
+                    truncation=True,
+                    max_length=self.config['max_seq_length'],
+                    return_tensors='pt'
+                )
+                
+                encoded = {k: v.to(device) for k, v in encoded.items()}
+                
+                outputs = model(**encoded)
+                logits = outputs.logits
+                probs = torch.softmax(logits, dim=1).cpu().numpy()
+                preds = torch.argmax(logits, dim=1).cpu().numpy()
+                
+                y_pred.extend(preds)
+                y_pred_proba.extend(probs)
+        
+        inference_time = time.time() - start_time
+        
+        y_pred = np.array(y_pred)
+        y_pred_proba = np.array(y_pred_proba)
+        
+        # Compute metrics
+        metrics = self.compute_all_metrics(y_test, y_pred, y_pred_proba)
+        
+        # Timing metrics
+        metrics['total_inference_time'] = float(inference_time)
+        metrics['inference_time_per_sample'] = float(inference_time / len(X_test_text) * 1000)
+        metrics['throughput'] = float(len(X_test_text) / inference_time)
+        
+        # Model size
+        metrics['model_parameters'] = sum(p.numel() for p in model.parameters())
+        
+        print(f"   Accuracy: {metrics['accuracy']:.4f}")
+        print(f"   F1-Score: {metrics['f1_score']:.4f}")
+        
+        return metrics, y_pred, y_pred_proba
+    
+    def evaluate_all_models(self, test_data):
+        """
+        Evaluate all trained models
+        
+        Args:
+            test_data: Dictionary with test features and labels
+            
+        Returns:
+            DataFrame with all results
+        """
+        print("\n" + "="*70)
+        print("COMPREHENSIVE MODEL EVALUATION")
+        print("="*70)
+        
+        all_results = []
+        
+        # Classical ML Models
+        print("\n" + "-"*70)
+        print("EVALUATING CLASSICAL ML MODELS")
+        print("-"*70)
+        
+        for model_name in CLASSICAL_ML_MODELS:
+            try:
+                metrics, y_pred, y_pred_proba = self.evaluate_classical_ml(
+                    model_name, test_data['X_test_uniembed'], test_data['y_test']
+                )
+                metrics['model_name'] = model_name
+                metrics['model_type'] = 'Classical ML'
+                all_results.append(metrics)
+                
+                # Save predictions
+                self.save_predictions(model_name, y_pred, y_pred_proba, test_data['y_test'])
+                
+            except Exception as e:
+                print(f" Error evaluating {model_name}: {str(e)}")
+        
+        # Deep Learning Models
+        print("\n" + "-"*70)
+        print("EVALUATING DEEP LEARNING MODELS")
+        print("-"*70)
+        
+        for model_name in DEEP_LEARNING_MODELS:
+            try:
+                metrics, y_pred, y_pred_proba = self.evaluate_deep_learning(
+                    model_name, test_data['X_test_uniembed'], test_data['y_test']
+                )
+                metrics['model_name'] = model_name
+                metrics['model_type'] = 'Deep Learning'
+                all_results.append(metrics)
+                
+                self.save_predictions(model_name, y_pred, y_pred_proba, test_data['y_test'])
+                
+            except Exception as e:
+                print(f" Error evaluating {model_name}: {str(e)}")
+        
+        # Transformer Models
+        print("\n" + "-"*70)
+        print("EVALUATING TRANSFORMER MODELS")
+        print("-"*70)
+        
+        for model_name in TRANSFORMER_MODELS:
+            try:
+                metrics, y_pred, y_pred_proba = self.evaluate_transformer(
+                    model_name, test_data['X_test_text'], test_data['y_test']
+                )
+                metrics['model_name'] = model_name
+                metrics['model_type'] = 'Transformer'
+                all_results.append(metrics)
+                
+                self.save_predictions(model_name, y_pred, y_pred_proba, test_data['y_test'])
+                
+            except Exception as e:
+                print(f" Error evaluating {model_name}: {str(e)}")
+        
+        # Create results DataFrame
+        results_df = pd.DataFrame(all_results)
+        
+        # Sort by F1-score
+        results_df = results_df.sort_values('f1_score', ascending=False)
+        
+        # Save results
+        results_path = f"{self.config['results_dir']}/metrics/all_models_metrics.csv"
+        results_df.to_csv(results_path, index=False)
+        print(f"\n Results saved: {results_path}")
+        
+        # Display summary
+        print("\n" + "="*70)
+        print("EVALUATION SUMMARY - TOP 10 MODELS")
+        print("="*70)
+        print(results_df[['model_name', 'accuracy', 'precision', 'recall', 'f1_score', 'roc_auc']].head(10).to_string(index=False))
+        
+        return results_df
+    
+    def save_predictions(self, model_name, y_pred, y_pred_proba, y_test):
+        """Save model predictions"""
+        pred_dir = f"{self.config['results_dir']}/predictions"
+        Path(pred_dir).mkdir(parents=True, exist_ok=True)
+        
+        predictions = {
+            'y_true': y_test.tolist(),
+            'y_pred': y_pred.tolist(),
+            'correct': (y_pred == y_test).tolist()
+        }
+        
+        if y_pred_proba is not None:
+            if len(y_pred_proba.shape) > 1 and y_pred_proba.shape[1] == 2:
+                predictions['y_pred_proba_class_1'] = y_pred_proba[:, 1].tolist()
+            else:
+                predictions['y_pred_proba_class_1'] = y_pred_proba.flatten().tolist()
+        
+        pred_path = f"{pred_dir}/{model_name}_predictions.json"
+        with open(pred_path, 'w') as f:
+            json.dump(predictions, f, indent=2)
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    
+    
+    set_seed(GLOBAL_CONFIG['random_seed'])
+    
+    # Load test data
+    feature_dir = f"{GLOBAL_CONFIG['base_dir']}/features"
+    data_dir = f"{GLOBAL_CONFIG['base_dir']}/data"
+    
+    test_data = {
+        'X_test_uniembed': np.load(f"{feature_dir}/X_test_uniembed.npy"),
+        'X_test_text': np.load(f"{data_dir}/X_test.npy", allow_pickle=True),
+        'y_test': np.load(f"{data_dir}/y_test.npy")
+    }
+    
+    # Evaluate all models
+    evaluator = ComprehensiveEvaluator(GLOBAL_CONFIG)
+    results_df = evaluator.evaluate_all_models(test_data)
+    
+    print("\n Comprehensive evaluation complete!")
+
+
+# ============================================================================
+# FILE: feature_engineering.py
+# DESCRIPTION: Extract all feature representations (MEMORY OPTIMIZED)
+# ============================================================================
+
+from config import GLOBAL_CONFIG
+
+import numpy as np
+import pandas as pd
+from gensim.models import Word2Vec, FastText
+import tensorflow_hub as hub
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_selection import chi2, SelectKBest
+from transformers import BertTokenizer, BertModel
+import torch
+from pathlib import Path
+import pickle
+import warnings
+import gc
+warnings.filterwarnings('ignore')
+
+# ============================================================================
+# UNIEMBED FEATURE EXTRACTION (MEMORY OPTIMIZED)
+# ============================================================================
+
+class UniEmbedExtractor:
+    """Extract UniEmbed features with dynamic dimensions"""
+    
+    def __init__(self, config=None):
+        if config is None:
+            config = GLOBAL_CONFIG
+        self.config = config
+        self.word2vec_model = None
+        self.fasttext_model = None
+        self.use_model = None
+        
+    def tokenize_texts(self, texts):
+        """Tokenize texts for training word embedding models"""
+        return [text.split() for text in texts]
+    
+    def train_word2vec(self, texts):
+        """Train Word2Vec model"""
+        print("Training Word2Vec model...")
+        
+        tokenized = self.tokenize_texts(texts)
+        vector_size = self.config['word2vec_dim']
+        
+        self.word2vec_model = Word2Vec(
+            sentences=tokenized,
+            vector_size=vector_size,
+            window=5,
+            min_count=1,
+            workers=2,
+            sg=0,
+            seed=self.config['random_seed']
+        )
+        
+        print(f"  Word2Vec trained: {len(self.word2vec_model.wv)} tokens")
+        return self.word2vec_model
+    
+    def train_fasttext(self, texts):
+        """Train FastText model"""
+        print("Training FastText model...")
+        
+        tokenized = self.tokenize_texts(texts)
+        vector_size = self.config['fasttext_dim']
+        
+        self.fasttext_model = FastText(
+            sentences=tokenized,
+            vector_size=vector_size,
+            window=5,
+            min_count=1,
+            workers=2,
+            min_n=3,
+            max_n=6,
+            seed=self.config['random_seed']
+        )
+        
+        print(f"  FastText trained: {len(self.fasttext_model.wv)} tokens")
+        return self.fasttext_model
+    
+    def load_use_model(self):
+        """Load Universal Sentence Encoder"""
+        if self.config.get('skip_use', False):
+            print("Skipping USE (disabled in config)")
+            return None
+            
+        print("Loading Universal Sentence Encoder...")
+        self.use_model = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
+        print("  USE loaded successfully")
+        return self.use_model
+    
+    def get_word2vec_embedding(self, text):
+        """Get Word2Vec embedding for a text"""
+        tokens = text.split()
+        vectors = []
+        
+        for token in tokens:
+            if token in self.word2vec_model.wv:
+                vectors.append(self.word2vec_model.wv[token])
+        
+        if vectors:
+            return np.mean(vectors, axis=0)
+        else:
+            return np.zeros(self.config['word2vec_dim'])
+    
+    def get_fasttext_embedding(self, text):
+        """Get FastText embedding for a text"""
+        tokens = text.split()
+        vectors = []
+        
+        for token in tokens:
+            vectors.append(self.fasttext_model.wv[token])
+        
+        if vectors:
+            return np.mean(vectors, axis=0)
+        else:
+            return np.zeros(self.config['fasttext_dim'])
+    
+    def get_use_embedding(self, texts):
+        """Get USE embeddings for texts"""
+        if self.use_model is None:
+            return np.zeros((len(texts), self.config['use_dim']))
+        embeddings = self.use_model(texts)
+        return embeddings.numpy()
+    
+    def extract_uniembed_features(self, texts, batch_size=1000):
+        """Extract complete UniEmbed features (dynamic dimensions)"""
+        
+        w2v_dim = self.config['word2vec_dim']
+        ft_dim = self.config['fasttext_dim']
+        use_dim = self.config['use_dim']
+        
+        # Calculate total based on whether USE is used
+        if self.config.get('skip_use', False):
+            total_dim = w2v_dim + ft_dim
+        else:
+            total_dim = w2v_dim + ft_dim + use_dim
+        
+        print("\n" + "="*70)
+        print(f"EXTRACTING UNIEMBED FEATURES ({total_dim}D)")
+        print(f"  Word2Vec: {w2v_dim}D")
+        print(f"  FastText: {ft_dim}D")
+        if not self.config.get('skip_use', False):
+            print(f"  USE: {use_dim}D")
+        print("="*70 + "\n")
+        
+        n_samples = len(texts)
+        uniembed_features = np.zeros((n_samples, total_dim))
+        
+        # Word2Vec
+        print("Extracting Word2Vec features...")
+        for i, text in enumerate(texts):
+            uniembed_features[i, :w2v_dim] = self.get_word2vec_embedding(text)
+            if (i + 1) % 10000 == 0:
+                print(f"  Processed {i + 1}/{n_samples} samples")
+        
+        # FastText
+        print("\nExtracting FastText features...")
+        for i, text in enumerate(texts):
+            uniembed_features[i, w2v_dim:w2v_dim+ft_dim] = self.get_fasttext_embedding(text)
+            if (i + 1) % 10000 == 0:
+                print(f"  Processed {i + 1}/{n_samples} samples")
+        
+        # USE (if not skipped)
+        if not self.config.get('skip_use', False):
+            print("\nExtracting USE features...")
+            use_start = w2v_dim + ft_dim
+            use_end = use_start + use_dim
+            
+            for i in range(0, n_samples, batch_size):
+                batch_end = min(i + batch_size, n_samples)
+                batch_texts = list(texts[i:batch_end])
+                
+                batch_embeddings = self.get_use_embedding(batch_texts)
+                uniembed_features[i:batch_end, use_start:use_end] = batch_embeddings
+                
+                if (batch_end) % 10000 == 0 or batch_end == n_samples:
+                    print(f"  Processed {batch_end}/{n_samples} samples")
+        
+        print(f"\nUniEmbed features extracted: {uniembed_features.shape}")
+        return uniembed_features
+    
+    def fit_transform(self, train_texts, val_texts, test_texts):
+        """Train models on train set and transform all sets"""
+        self.train_word2vec(train_texts)
+        self.train_fasttext(train_texts)
+        self.load_use_model()
+        
+        X_train_uniembed = self.extract_uniembed_features(train_texts)
+        gc.collect()
+        
+        X_val_uniembed = self.extract_uniembed_features(val_texts)
+        gc.collect()
+        
+        X_test_uniembed = self.extract_uniembed_features(test_texts)
+        gc.collect()
+        
+        return X_train_uniembed, X_val_uniembed, X_test_uniembed
+    
+    def save(self, save_dir):
+        """Save trained models"""
+        print(f"\nSaving UniEmbed models to {save_dir}...")
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        self.word2vec_model.save(f"{save_dir}/word2vec.model")
+        self.fasttext_model.save(f"{save_dir}/fasttext.model")
+        
+        print("Models saved successfully!")
+
+# ============================================================================
+# TF-IDF FEATURE EXTRACTION
+# ============================================================================
+
+class TFIDFExtractor:
+    """Extract TF-IDF features"""
+    
+    def __init__(self, config=None):
+        if config is None:
+            config = GLOBAL_CONFIG
+        self.config = config
+        self.vectorizer = TfidfVectorizer(
+            max_features=config['tfidf_max_features'],
+            ngram_range=config['tfidf_ngram_range'],
+            analyzer='word',
+            lowercase=True,
+            stop_words='english'
+        )
+    
+    def fit_transform(self, train_texts, val_texts, test_texts):
+        """Fit on train and transform all sets"""
+        print("\n" + "="*70)
+        print(f"EXTRACTING TF-IDF FEATURES ({self.config['tfidf_max_features']}D)")
+        print("="*70 + "\n")
+        
+        print("Fitting TF-IDF vectorizer...")
+        X_train_tfidf = self.vectorizer.fit_transform(train_texts)
+        
+        print("Transforming validation set...")
+        X_val_tfidf = self.vectorizer.transform(val_texts)
+        
+        print("Transforming test set...")
+        X_test_tfidf = self.vectorizer.transform(test_texts)
+        
+        print(f"\nTF-IDF features extracted:")
+        print(f"   Train: {X_train_tfidf.shape}")
+        print(f"   Val: {X_val_tfidf.shape}")
+        print(f"   Test: {X_test_tfidf.shape}")
+        
+        X_train_tfidf = X_train_tfidf.toarray()
+        X_val_tfidf = X_val_tfidf.toarray()
+        X_test_tfidf = X_test_tfidf.toarray()
+        
+        return X_train_tfidf, X_val_tfidf, X_test_tfidf
+    
+    def save(self, save_dir):
+        """Save vectorizer"""
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        with open(f"{save_dir}/tfidf_vectorizer.pkl", 'wb') as f:
+            pickle.dump(self.vectorizer, f)
+        print("TF-IDF vectorizer saved!")
+
+# ============================================================================
+# MAIN FEATURE EXTRACTION PIPELINE
+# ============================================================================
+
+def extract_all_features(splits, config=None):
+    """Extract all feature representations"""
+    
+    if config is None:
+        config = GLOBAL_CONFIG
+    
+    X_train, X_val, X_test = splits['X_train'], splits['X_val'], splits['X_test']
+    y_train = splits['y_train']
+    
+    features = {}
+    feature_dir = f"{config['base_dir']}/features"
+    Path(feature_dir).mkdir(parents=True, exist_ok=True)
+    
+    # 1. UniEmbed Features
+    print("\n" + "="*70)
+    print("STAGE 1: UNIEMBED FEATURES")
+    print("="*70)
+    
+    uniembed_extractor = UniEmbedExtractor(config)
+    X_train_uni, X_val_uni, X_test_uni = uniembed_extractor.fit_transform(
+        X_train, X_val, X_test
+    )
+    uniembed_extractor.save(feature_dir)
+    
+    features['uniembed'] = {
+        'X_train': X_train_uni,
+        'X_val': X_val_uni,
+        'X_test': X_test_uni
+    }
+    
+    np.save(f"{feature_dir}/X_train_uniembed.npy", X_train_uni)
+    np.save(f"{feature_dir}/X_val_uniembed.npy", X_val_uni)
+    np.save(f"{feature_dir}/X_test_uniembed.npy", X_test_uni)
+    
+    del X_train_uni, X_val_uni, X_test_uni
+    gc.collect()
+    
+    # 2. TF-IDF Features
+    print("\n" + "="*70)
+    print("STAGE 2: TF-IDF FEATURES")
+    print("="*70)
+    
+    tfidf_extractor = TFIDFExtractor(config)
+    X_train_tfidf, X_val_tfidf, X_test_tfidf = tfidf_extractor.fit_transform(
+        X_train, X_val, X_test
+    )
+    tfidf_extractor.save(feature_dir)
+    
+    features['tfidf'] = {
+        'X_train': X_train_tfidf,
+        'X_val': X_val_tfidf,
+        'X_test': X_test_tfidf
+    }
+    
+    np.save(f"{feature_dir}/X_train_tfidf.npy", X_train_tfidf)
+    np.save(f"{feature_dir}/X_val_tfidf.npy", X_val_tfidf)
+    np.save(f"{feature_dir}/X_test_tfidf.npy", X_test_tfidf)
+    
+    del X_train_tfidf, X_val_tfidf, X_test_tfidf
+    gc.collect()
+    
+    print("\n" + "="*70)
+    print("ALL FEATURES EXTRACTED AND SAVED!")
+    print("="*70)
+    
+    return features
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    from config import GLOBAL_CONFIG, set_seed
+    
+    set_seed(GLOBAL_CONFIG['random_seed'])
+    
+    data_dir = f"{GLOBAL_CONFIG['base_dir']}/data"
+    
+    splits = {
+        'X_train': np.load(f"{data_dir}/X_train.npy", allow_pickle=True),
+        'y_train': np.load(f"{data_dir}/y_train.npy"),
+        'X_val': np.load(f"{data_dir}/X_val.npy", allow_pickle=True),
+        'y_val': np.load(f"{data_dir}/y_val.npy"),
+        'X_test': np.load(f"{data_dir}/X_test.npy", allow_pickle=True),
+        'y_test': np.load(f"{data_dir}/y_test.npy"),
+    }
+    
+    features = extract_all_features(splits, GLOBAL_CONFIG)
+    
+    print("\nFeature extraction pipeline complete!")
+
+
+# ============================================================================
+# FILE: 11_master_runner.py
+# DESCRIPTION: Master script to run entire pipeline
+# ============================================================================
+
+import sys
+import time
+from pathlib import Path
+import numpy as np
+from config import GLOBAL_CONFIG
+from visualization import VisualizationGenerator
+from evaluation import ComprehensiveEvaluator
+from config import set_seed, create_directory_structure, check_gpu
+from data_preprocessing import DataLoader
+from feature_engineering import extract_all_features
+from models_classical import ClassicalMLTrainer
+from models_deep_learning import DeepLearningTrainer
+from models_transformers import TransformerTrainer
+from models_gnn import GraphConstructor, GNNTrainer
+from gensim.models import Word2Vec
+from models_hybrid import HybridModelTrainer
+        
+# ============================================================================
+# MASTER PIPELINE ORCHESTRATOR
+# ============================================================================
+
+class MasterPipeline:
+    """Orchestrate the entire research pipeline"""
+    
+    def __init__(self, config=GLOBAL_CONFIG):
+        self.config = config
+        self.start_time = None
+        
+    def print_header(self, text):
+        """Print formatted header"""
+        print("\n" + "="*70)
+        print(text.center(70))
+        print("="*70 + "\n")
+    
+    def print_step(self, step_num, total_steps, description):
+        """Print step information"""
+        print(f"\n[STEP {step_num}/{total_steps}] {description}")
+        print("-"*70)
+    
+    def run_setup(self):
+        """Step 1: Setup and configuration"""
+        self.print_step(1, 10, "SETUP AND CONFIGURATION")
+        
+        
+        
+        set_seed(self.config['random_seed'])
+        create_directory_structure()
+        check_gpu()
+        
+        print("Setup complete!")
+    
+    def run_data_preprocessing(self):
+        """Step 2: Data preprocessing"""
+        self.print_step(2, 10, "DATA PREPROCESSING")
+        
+        
+        
+        loader = DataLoader(data_dir=self.config['data_dir'])
+        merged_df, individual_datasets = loader.load_all_datasets()
+        processed_df = loader.preprocess_data(merged_df)
+        splits = loader.create_splits(processed_df)
+        
+        # Save processed data
+        save_dir = f"{self.config['base_dir']}/data"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        np.save(f"{save_dir}/X_train.npy", splits['X_train'])
+        np.save(f"{save_dir}/y_train.npy", splits['y_train'])
+        np.save(f"{save_dir}/X_val.npy", splits['X_val'])
+        np.save(f"{save_dir}/y_val.npy", splits['y_val'])
+        np.save(f"{save_dir}/X_test.npy", splits['X_test'])
+        np.save(f"{save_dir}/y_test.npy", splits['y_test'])
+        
+        processed_df.to_csv(f"{save_dir}/processed_data.csv", index=False)
+        
+        print("Data preprocessing complete!")
+        return splits
+    
+    def run_feature_extraction(self, splits):
+        """Step 3: Feature extraction"""
+        self.print_step(3, 10, "FEATURE EXTRACTION")
+        
+        
+        
+        features = extract_all_features(splits, self.config)
+        
+        print("Feature extraction complete!")
+        return features
+    
+    def run_classical_ml_training(self):
+        """Step 4: Train classical ML models"""
+        self.print_step(4, 10, "TRAINING CLASSICAL ML MODELS")
+        
+        
+        
+        # Load features and labels
+        feature_dir = f"{self.config['base_dir']}/features"
+        data_dir = f"{self.config['base_dir']}/data"
+        
+        X_train = np.load(f"{feature_dir}/X_train_uniembed.npy")
+        X_val = np.load(f"{feature_dir}/X_val_uniembed.npy")
+        y_train = np.load(f"{data_dir}/y_train.npy")
+        y_val = np.load(f"{data_dir}/y_val.npy")
+        
+        trainer = ClassicalMLTrainer(self.config)
+        trained_models = trainer.train_all_classical_models(
+            X_train, y_train, X_val, y_val, feature_type='uniembed'
+        )
+        
+        print(f"Classical ML training complete! Trained {len(trained_models)} models.")
+    
+    def run_deep_learning_training(self):
+        """Step 5: Train deep learning models"""
+        self.print_step(5, 10, "TRAINING DEEP LEARNING MODELS")
+        
+        
+        
+        # Load features and labels
+        feature_dir = f"{self.config['base_dir']}/features"
+        data_dir = f"{self.config['base_dir']}/data"
+        
+        X_train = np.load(f"{feature_dir}/X_train_uniembed.npy")
+        X_val = np.load(f"{feature_dir}/X_val_uniembed.npy")
+        y_train = np.load(f"{data_dir}/y_train.npy")
+        y_val = np.load(f"{data_dir}/y_val.npy")
+        
+        trainer = DeepLearningTrainer(self.config)
+        trained_models = trainer.train_all_deep_learning_models(
+            X_train, y_train, X_val, y_val, feature_type='uniembed'
+        )
+        
+        print(f"Deep learning training complete! Trained {len(trained_models)} models.")
+    
+    def run_transformer_training(self):
+        """Step 6: Train transformer models"""
+        self.print_step(6, 10, "FINE-TUNING TRANSFORMER MODELS")
+        
+        
+        
+        # Load text data
+        data_dir = f"{self.config['base_dir']}/data"
+        
+        X_train = np.load(f"{data_dir}/X_train.npy", allow_pickle=True)
+        X_val = np.load(f"{data_dir}/X_val.npy", allow_pickle=True)
+        y_train = np.load(f"{data_dir}/y_train.npy")
+        y_val = np.load(f"{data_dir}/y_val.npy")
+        
+        trainer = TransformerTrainer(self.config)
+        trained_models = trainer.train_all_transformer_models(
+            X_train, y_train, X_val, y_val
+        )
+        
+        print(f"Transformer training complete! Trained {len(trained_models)} models.")
+    
+    def run_gnn_training(self):
+        """Step 7: Train GNN models"""
+        self.print_step(7, 10, "TRAINING GRAPH NEURAL NETWORK MODELS")
+        
+        
+        import pickle
+        
+        # Load Word2Vec model
+        feature_dir = f"{self.config['base_dir']}/features"
+        word2vec_model = Word2Vec.load(f"{feature_dir}/word2vec.model")
+        
+        # Load text data
+        data_dir = f"{self.config['base_dir']}/data"
+        X_train = np.load(f"{data_dir}/X_train.npy", allow_pickle=True)
+        X_val = np.load(f"{data_dir}/X_val.npy", allow_pickle=True)
+        X_test = np.load(f"{data_dir}/X_test.npy", allow_pickle=True)
+        y_train = np.load(f"{data_dir}/y_train.npy")
+        y_val = np.load(f"{data_dir}/y_val.npy")
+        y_test = np.load(f"{data_dir}/y_test.npy")
+        
+        # Construct graphs
+        constructor = GraphConstructor(word2vec_model)
+        
+        print("Constructing training graphs...")
+        train_graphs = constructor.texts_to_graphs(X_train, y_train)
+        
+        print("Constructing validation graphs...")
+        val_graphs = constructor.texts_to_graphs(X_val, y_val)
+        
+        print("Constructing test graphs...")
+        test_graphs = constructor.texts_to_graphs(X_test, y_test)
+        
+        # Save graphs
+        with open(f"{data_dir}/train_graphs.pkl", 'wb') as f:
+            pickle.dump(train_graphs, f)
+        with open(f"{data_dir}/val_graphs.pkl", 'wb') as f:
+            pickle.dump(val_graphs, f)
+        with open(f"{data_dir}/test_graphs.pkl", 'wb') as f:
+            pickle.dump(test_graphs, f)
+        
+        # Train GNN models
+        trainer = GNNTrainer(self.config)
+        trained_models = trainer.train_all_gnn_models(train_graphs, val_graphs)
+        
+        print(f"GNN training complete! Trained {len(trained_models)} models.")
+    
+    def run_hybrid_training(self):
+        """Step 8: Train hybrid ensemble models"""
+        self.print_step(8, 10, "TRAINING HYBRID ENSEMBLE MODELS")
+        
+        
+        
+        # Load features and labels
+        feature_dir = f"{self.config['base_dir']}/features"
+        data_dir = f"{self.config['base_dir']}/data"
+        
+        X_train = np.load(f"{feature_dir}/X_train_uniembed.npy")
+        X_val = np.load(f"{feature_dir}/X_val_uniembed.npy")
+        X_bert_train = np.load(f"{feature_dir}/X_train_bert.npy")
+        X_bert_val = np.load(f"{feature_dir}/X_val_bert.npy")
+        y_train = np.load(f"{data_dir}/y_train.npy")
+        y_val = np.load(f"{data_dir}/y_val.npy")
+        
+        trainer = HybridModelTrainer(self.config)
+        trained_models = trainer.train_all_hybrid_models(
+            X_train, y_train, X_val, y_val,
+            X_bert_train, X_bert_val
+        )
+        
+        print(f"Hybrid training complete! Trained {len(trained_models)} models.")
+    
+    def run_evaluation(self):
+        """Step 9: Comprehensive evaluation"""
+        self.print_step(9, 10, "COMPREHENSIVE MODEL EVALUATION")
+        
+        
+        
+        # Load test data
+        feature_dir = f"{self.config['base_dir']}/features"
+        data_dir = f"{self.config['base_dir']}/data"
+        
+        test_data = {
+            'X_test_uniembed': np.load(f"{feature_dir}/X_test_uniembed.npy"),
+            'X_test_text': np.load(f"{data_dir}/X_test.npy", allow_pickle=True),
+            'y_test': np.load(f"{data_dir}/y_test.npy")
+        }
+        
+        evaluator = ComprehensiveEvaluator(self.config)
+        results_df = evaluator.evaluate_all_models(test_data)
+        
+        print("Evaluation complete!")
+        return results_df
+    
+    def run_visualization(self, results_df):
+        """Step 10: Generate visualizations"""
+        self.print_step(10, 10, "GENERATING VISUALIZATIONS")
+        
+        
+        
+        viz_gen = VisualizationGenerator(self.config)
+        viz_gen.generate_all_visualizations(results_df)
+        
+        print("Visualization generation complete!")
+    
+    def run_full_pipeline(self, skip_steps=None):
+        """
+        Run the complete pipeline
+        
+        Args:
+            skip_steps: List of step numbers to skip (e.g., [1, 2] to skip setup and preprocessing)
+        """
+        if skip_steps is None:
+            skip_steps = []
+        
+        self.start_time = time.time()
+        
+        self.print_header("COMPREHENSIVE WEB ATTACK DETECTION RESEARCH PIPELINE")
+        print(f"Starting pipeline execution at: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Random seed: {self.config['random_seed']}")
+        print(f"Output directory: {self.config['base_dir']}")
+        
+        try:
+            # Step 1: Setup
+            if 1 not in skip_steps:
+                self.run_setup()
+            
+            # Step 2: Data preprocessing
+            if 2 not in skip_steps:
+                splits = self.run_data_preprocessing()
+            
+            # Step 3: Feature extraction
+            if 3 not in skip_steps:
+                self.run_feature_extraction(splits if 2 not in skip_steps else None)
+            
+            # Step 4: Classical ML training
+            if 4 not in skip_steps:
+                self.run_classical_ml_training()
+            
+            # Step 5: Deep learning training
+            if 5 not in skip_steps:
+                self.run_deep_learning_training()
+            
+            # Step 6: Transformer training
+            if 6 not in skip_steps:
+                self.run_transformer_training()
+            
+            # Step 7: GNN training
+            if 7 not in skip_steps:
+                self.run_gnn_training()
+            
+            # Step 8: Hybrid training
+            if 8 not in skip_steps:
+                self.run_hybrid_training()
+            
+            # Step 9: Evaluation
+            if 9 not in skip_steps:
+                results_df = self.run_evaluation()
+            
+            # Step 10: Visualization
+            if 10 not in skip_steps:
+                self.run_visualization(results_df if 9 not in skip_steps else None)
+            
+            # Final summary
+            self.print_final_summary()
+            
+        except Exception as e:
+            print(f"\nERROR: Pipeline execution failed!")
+            print(f"Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+    
+    def print_final_summary(self):
+        """Print final execution summary"""
+        
+        total_time = time.time() - self.start_time
+        hours = int(total_time // 3600)
+        minutes = int((total_time % 3600) // 60)
+        seconds = int(total_time % 60)
+        
+        self.print_header("PIPELINE EXECUTION COMPLETE")
+        
+        print(f"Total execution time: {hours}h {minutes}m {seconds}s")
+        print(f"Completion time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        print("\nOutput locations:")
+        print(f"  - Models: {self.config['models_dir']}")
+        print(f"  - Results: {self.config['results_dir']}")
+        print(f"  - Visualizations: {self.config['viz_dir']}")
+        print(f"  - Logs: {self.config['logs_dir']}")
+        
+        print("\nKey deliverables:")
+        print("  [+] 32 trained models")
+        print("  [+] Comprehensive evaluation metrics")
+        print("  [+] Publication-ready visualizations")
+        print("  [+] Model predictions and error analysis")
+        
+        print("\nNext steps:")
+        print("  1. Review results in: all_models_metrics.csv")
+        print("  2. Examine visualizations in the viz directory")
+        print("  3. Analyze model predictions for insights")
+        print("  4. Generate research paper figures and tables")
+        
+        print("\n" + "="*70)
+        print("RESEARCH PIPELINE SUCCESSFULLY COMPLETED".center(70))
+        print("="*70 + "\n")
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Run comprehensive web attack detection pipeline')
+    parser.add_argument('--skip-steps', nargs='+', type=int, default=[],
+                       help='Steps to skip (1-10)')
+    parser.add_argument('--config', type=str, default=None,
+                       help='Path to custom config file')
+    
+    args = parser.parse_args()
+    
+    # Import configuration
+    
+    
+    # Run pipeline
+    pipeline = MasterPipeline(GLOBAL_CONFIG)
+    pipeline.run_full_pipeline(skip_steps=args.skip_steps)
+
+
+# ============================================================================
+# FILE: models_classical.py
+# DESCRIPTION: Classical ML models with memory optimization
+# ============================================================================
+
+from config import GLOBAL_CONFIG, CLASSICAL_ML_MODELS, clear_memory
+
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.naive_bayes import GaussianNB
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import (
+    RandomForestClassifier, 
+    GradientBoostingClassifier,
+    ExtraTreesClassifier
+)
+from xgboost import XGBClassifier
+import joblib
+from pathlib import Path
+import time
+import json
+import gc
+
+# ============================================================================
+# CLASSICAL ML MODEL FACTORY
+# ============================================================================
+
+class ClassicalMLModelFactory:
+    """Factory for creating classical ML models"""
+    
+    def __init__(self, config=None):
+        if config is None:
+            config = GLOBAL_CONFIG
+        self.config = config
+        
+    def create_model(self, model_name):
+        """Create model by name"""
+        
+        models = {
+            'Logistic_Regression': LogisticRegression(
+                max_iter=self.config['max_iter'],
+                C=1.0,
+                penalty='l2',
+                solver='lbfgs',
+                random_state=self.config['random_seed'],
+                n_jobs=self.config['n_jobs']
+            ),
+            
+            'SVM': SVC(
+                kernel='rbf',
+                C=1.0,
+                gamma='scale',
+                probability=True,
+                random_state=self.config['random_seed'],
+                max_iter=self.config['max_iter']
+            ),
+            
+            'Gaussian_Naive_Bayes': GaussianNB(),
+            
+            'Decision_Tree': DecisionTreeClassifier(
+                max_depth=10,
+                criterion='gini',
+                splitter='best',
+                random_state=self.config['random_seed']
+            ),
+            
+            'KNN': KNeighborsClassifier(
+                n_neighbors=5,
+                weights='uniform',
+                metric='euclidean',
+                n_jobs=self.config['n_jobs']
+            ),
+            
+            'Random_Forest': RandomForestClassifier(
+                n_estimators=100,
+                max_depth=15,
+                criterion='gini',
+                random_state=self.config['random_seed'],
+                n_jobs=self.config['n_jobs']
+            ),
+            
+            'XGBoost': XGBClassifier(
+                n_estimators=200,
+                learning_rate=0.1,
+                max_depth=6,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                random_state=self.config['random_seed'],
+                n_jobs=self.config['n_jobs'],
+                eval_metric='logloss'
+            ),
+            
+            'Gradient_Boosting': GradientBoostingClassifier(
+                n_estimators=100,
+                learning_rate=0.1,
+                max_depth=5,
+                subsample=0.8,
+                random_state=self.config['random_seed']
+            ),
+            
+            'Extra_Trees': ExtraTreesClassifier(
+                n_estimators=100,
+                max_depth=15,
+                criterion='gini',
+                random_state=self.config['random_seed'],
+                n_jobs=self.config['n_jobs']
+            )
+        }
+        
+        if model_name not in models:
+            raise ValueError(f"Unknown model: {model_name}")
+        
+        return models[model_name]
+
+# ============================================================================
+# CLASSICAL ML TRAINER
+# ============================================================================
+
+class ClassicalMLTrainer:
+    """Train and evaluate classical ML models"""
+    
+    def __init__(self, config=None):
+        if config is None:
+            config = GLOBAL_CONFIG
+        self.config = config
+        self.factory = ClassicalMLModelFactory(config)
+        
+    def train_model(self, model_name, X_train, y_train, X_val=None, y_val=None):
+        """Train a classical ML model"""
+        
+        print(f"\n{'='*70}")
+        print(f"TRAINING: {model_name}")
+        print(f"{'='*70}\n")
+        
+        model = self.factory.create_model(model_name)
+        
+        print(f"Training {model_name}...")
+        print(f"   Training samples: {X_train.shape[0]}")
+        print(f"   Features: {X_train.shape[1]}")
+        
+        start_time = time.time()
+        model.fit(X_train, y_train)
+        training_time = time.time() - start_time
+        
+        print(f"Training complete in {training_time:.2f} seconds")
+        
+        model_info = {
+            'model_name': model_name,
+            'training_time': training_time,
+            'training_samples': X_train.shape[0],
+            'n_features': X_train.shape[1],
+        }
+        
+        if hasattr(model, 'n_features_in_'):
+            model_info['n_features_in'] = model.n_features_in_
+        
+        if hasattr(model, 'feature_importances_'):
+            model_info['has_feature_importance'] = True
+        
+        return model, model_info
+    
+    def save_model(self, model, model_name, model_info, save_dir=None):
+        """Save trained model and metadata"""
+        if save_dir is None:
+            save_dir = f"{self.config['models_dir']}/classical_ml"
+        
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        model_path = f"{save_dir}/{model_name}.pkl"
+        joblib.dump(model, model_path)
+        
+        metadata_path = f"{save_dir}/{model_name}_metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(model_info, f, indent=2)
+        
+        print(f"Model saved: {model_path}")
+        print(f"Metadata saved: {metadata_path}")
+        
+    def load_model(self, model_name, save_dir=None):
+        """Load trained model"""
+        if save_dir is None:
+            save_dir = f"{self.config['models_dir']}/classical_ml"
+        
+        model_path = f"{save_dir}/{model_name}.pkl"
+        model = joblib.load(model_path)
+        
+        metadata_path = f"{save_dir}/{model_name}_metadata.json"
+        with open(metadata_path, 'r') as f:
+            metadata = json.load(f)
+        
+        return model, metadata
+    
+    def train_all_classical_models(self, X_train, y_train, X_val, y_val, 
+                                   feature_type='uniembed'):
+        """Train all classical ML models"""
+        
+        print(f"\n{'='*70}")
+        print(f"TRAINING ALL CLASSICAL ML MODELS")
+        print(f"Feature Type: {feature_type.upper()}")
+        print(f"{'='*70}\n")
+        
+        trained_models = {}
+        
+        for model_name in CLASSICAL_ML_MODELS:
+            try:
+                model, model_info = self.train_model(
+                    model_name, X_train, y_train, X_val, y_val
+                )
+                
+                model_info['feature_type'] = feature_type
+                
+                self.save_model(model, model_name, model_info)
+                
+                trained_models[model_name] = {
+                    'model': model,
+                    'info': model_info
+                }
+                
+                print(f"{model_name} complete!\n")
+                
+                # MEMORY OPTIMIZATION: Clear memory after each model
+                del model
+                gc.collect()
+                
+                if self.config.get('clear_memory_after_model', True):
+                    clear_memory()
+                
+            except Exception as e:
+                print(f"Error training {model_name}: {str(e)}\n")
+                continue
+        
+        print(f"\n{'='*70}")
+        print(f"ALL CLASSICAL ML MODELS TRAINED: {len(trained_models)}/{len(CLASSICAL_ML_MODELS)}")
+        print(f"{'='*70}\n")
+        
+        return trained_models
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    from config import GLOBAL_CONFIG, set_seed
+    
+    set_seed(GLOBAL_CONFIG['random_seed'])
+    
+    feature_dir = f"{GLOBAL_CONFIG['base_dir']}/features"
+    X_train = np.load(f"{feature_dir}/X_train_uniembed.npy")
+    X_val = np.load(f"{feature_dir}/X_val_uniembed.npy")
+    X_test = np.load(f"{feature_dir}/X_test_uniembed.npy")
+    
+    data_dir = f"{GLOBAL_CONFIG['base_dir']}/data"
+    y_train = np.load(f"{data_dir}/y_train.npy")
+    y_val = np.load(f"{data_dir}/y_val.npy")
+    y_test = np.load(f"{data_dir}/y_test.npy")
+    
+    trainer = ClassicalMLTrainer(GLOBAL_CONFIG)
+    trained_models = trainer.train_all_classical_models(
+        X_train, y_train, X_val, y_val, feature_type='uniembed'
+    )
+    
+    print("Classical ML training complete!")
+
+
+# ============================================================================
+# FILE: models_deep_learning.py
+# DESCRIPTION: Deep learning models with memory optimization
+# ============================================================================
+
+from config import GLOBAL_CONFIG, DEEP_LEARNING_MODELS, MODEL_ARCHITECTURES, clear_memory
+
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers, Model
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+import time
+import json
+from pathlib import Path
+import gc
+
+# ============================================================================
+# DEEP LEARNING MODEL ARCHITECTURES
+# ============================================================================
+
+class DeepLearningModelFactory:
+    """Factory for creating deep learning models"""
+    
+    def __init__(self, config=None):
+        if config is None:
+            config = GLOBAL_CONFIG
+        self.config = config
+        
+    def create_mlp(self, input_dim):
+        """Multi-Layer Perceptron"""
+        arch = MODEL_ARCHITECTURES['MLP']
+        
+        model = keras.Sequential([
+            layers.Input(shape=(input_dim,)),
+            layers.Dense(arch['layers'][0], activation='relu', 
+                        kernel_regularizer=keras.regularizers.l2(self.config['l2_regularization'])),
+            layers.Dropout(arch['dropout']),
+            layers.Dense(arch['layers'][1], activation='relu',
+                        kernel_regularizer=keras.regularizers.l2(self.config['l2_regularization'])),
+            layers.Dropout(arch['dropout']),
+            layers.Dense(arch['layers'][2], activation='relu',
+                        kernel_regularizer=keras.regularizers.l2(self.config['l2_regularization'])),
+            layers.Dropout(arch['dropout']),
+            layers.Dense(1, activation='sigmoid')
+        ], name='MLP')
+        
+        return model
+    
+    def create_cnn(self, input_dim):
+        """Convolutional Neural Network"""
+        arch = MODEL_ARCHITECTURES['CNN']
+        
+        inputs = layers.Input(shape=(input_dim, 1))
+        
+        x = layers.Conv1D(arch['conv_layers'][0]['filters'], 
+                         kernel_size=arch['conv_layers'][0]['kernel_size'], 
+                         activation='relu', padding='same')(inputs)
+        x = layers.MaxPooling1D(pool_size=arch['pool_size'])(x)
+        
+        x = layers.Conv1D(arch['conv_layers'][1]['filters'], 
+                         kernel_size=arch['conv_layers'][1]['kernel_size'], 
+                         activation='relu', padding='same')(x)
+        x = layers.MaxPooling1D(pool_size=arch['pool_size'])(x)
+        
+        x = layers.Flatten()(x)
+        x = layers.Dense(arch['dense_units'], activation='relu',
+                        kernel_regularizer=keras.regularizers.l2(self.config['l2_regularization']))(x)
+        x = layers.Dropout(arch['dropout'])(x)
+        outputs = layers.Dense(1, activation='sigmoid')(x)
+        
+        model = Model(inputs=inputs, outputs=outputs, name='CNN')
+        return model
+    
+    def create_lstm(self, input_dim, timesteps=None):
+        """LSTM Network"""
+        if timesteps is None:
+            timesteps = min(input_dim, 50)
+        
+        arch = MODEL_ARCHITECTURES['BiLSTM']
+        
+        inputs = layers.Input(shape=(timesteps, input_dim // timesteps))
+        
+        x = layers.LSTM(arch['lstm_units'][0], return_sequences=True)(inputs)
+        x = layers.Dropout(arch['dropout'])(x)
+        x = layers.LSTM(arch['lstm_units'][1])(x)
+        x = layers.Dropout(arch['dropout'])(x)
+        x = layers.Dense(arch['dense_units'], activation='relu')(x)
+        x = layers.Dropout(arch['dropout'])(x)
+        outputs = layers.Dense(1, activation='sigmoid')(x)
+        
+        model = Model(inputs=inputs, outputs=outputs, name='LSTM')
+        return model
+    
+    def create_bilstm(self, input_dim, timesteps=None):
+        """Bidirectional LSTM"""
+        if timesteps is None:
+            timesteps = min(input_dim, 50)
+        
+        arch = MODEL_ARCHITECTURES['BiLSTM']
+        
+        inputs = layers.Input(shape=(timesteps, input_dim // timesteps))
+        
+        x = layers.Bidirectional(layers.LSTM(arch['lstm_units'][0], return_sequences=True))(inputs)
+        x = layers.Dropout(arch['dropout'])(x)
+        x = layers.Bidirectional(layers.LSTM(arch['lstm_units'][1]))(x)
+        x = layers.Dropout(arch['dropout'])(x)
+        x = layers.Dense(arch['dense_units'], activation='relu')(x)
+        x = layers.Dropout(arch['dropout'])(x)
+        outputs = layers.Dense(1, activation='sigmoid')(x)
+        
+        model = Model(inputs=inputs, outputs=outputs, name='BiLSTM')
+        return model
+    
+    def create_cnn_lstm(self, input_dim, timesteps=None):
+        """CNN-LSTM Hybrid"""
+        if timesteps is None:
+            timesteps = min(input_dim, 50)
+        
+        arch = MODEL_ARCHITECTURES['CNN_LSTM']
+        
+        inputs = layers.Input(shape=(timesteps, input_dim // timesteps))
+        
+        x = layers.Conv1D(arch['conv_layers'][0]['filters'], 
+                         kernel_size=arch['conv_layers'][0]['kernel_size'], 
+                         activation='relu', padding='same')(inputs)
+        x = layers.MaxPooling1D(pool_size=arch['pool_size'])(x)
+        x = layers.Conv1D(arch['conv_layers'][1]['filters'], 
+                         kernel_size=arch['conv_layers'][1]['kernel_size'], 
+                         activation='relu', padding='same')(x)
+        x = layers.MaxPooling1D(pool_size=arch['pool_size'])(x)
+        
+        x = layers.LSTM(arch['lstm_units'])(x)
+        x = layers.Dropout(arch['dropout'])(x)
+        
+        x = layers.Dense(arch['dense_units'], activation='relu')(x)
+        x = layers.Dropout(arch['dropout'])(x)
+        outputs = layers.Dense(1, activation='sigmoid')(x)
+        
+        model = Model(inputs=inputs, outputs=outputs, name='CNN_LSTM')
+        return model
+    
+    def create_model(self, model_name, input_dim):
+        """Create model by name"""
+        
+        creators = {
+            'MLP': self.create_mlp,
+            'CNN': self.create_cnn,
+            'LSTM': self.create_lstm,
+            'BiLSTM': self.create_bilstm,
+            'CNN_LSTM': self.create_cnn_lstm
+        }
+        
+        if model_name not in creators:
+            raise ValueError(f"Unknown model: {model_name}")
+        
+        return creators[model_name](input_dim)
+
+# ============================================================================
+# DEEP LEARNING TRAINER
+# ============================================================================
+
+class DeepLearningTrainer:
+    """Train and evaluate deep learning models"""
+    
+    def __init__(self, config=None):
+        if config is None:
+            config = GLOBAL_CONFIG
+        self.config = config
+        self.factory = DeepLearningModelFactory(config)
+        
+    def prepare_data_for_model(self, X, model_name):
+        """Reshape data based on model requirements"""
+        
+        if model_name == 'MLP':
+            return X
+        
+        elif model_name == 'CNN':
+            return X.reshape(X.shape[0], X.shape[1], 1)
+        
+        elif model_name in ['LSTM', 'BiLSTM', 'CNN_LSTM']:
+            n_features = X.shape[1]
+            timesteps = min(n_features, 50)
+            features_per_timestep = n_features // timesteps
+            
+            truncated_features = timesteps * features_per_timestep
+            X_truncated = X[:, :truncated_features]
+            
+            return X_truncated.reshape(X.shape[0], timesteps, features_per_timestep)
+        
+        else:
+            return X
+    
+    def train_model(self, model_name, X_train, y_train, X_val, y_val):
+        """Train a deep learning model"""
+        
+        print(f"\n{'='*70}")
+        print(f"TRAINING: {model_name}")
+        print(f"{'='*70}\n")
+        
+        print("Preparing data...")
+        X_train_prepared = self.prepare_data_for_model(X_train, model_name)
+        X_val_prepared = self.prepare_data_for_model(X_val, model_name)
+        
+        print(f"   Train shape: {X_train_prepared.shape}")
+        print(f"   Val shape: {X_val_prepared.shape}")
+        
+        input_dim = X_train.shape[1]
+        model = self.factory.create_model(model_name, input_dim)
+        
+        model.compile(
+            optimizer=keras.optimizers.Adam(learning_rate=self.config['learning_rate']),
+            loss=self.config['loss_function'],
+            metrics=['accuracy', keras.metrics.Precision(), keras.metrics.Recall()]
+        )
+        
+        print(f"\nModel Architecture:")
+        model.summary()
+        
+        callbacks = [
+            EarlyStopping(
+                monitor=self.config['early_stopping_metric'],
+                patience=self.config['early_stopping_patience'],
+                restore_best_weights=True,
+                verbose=1
+            ),
+            ReduceLROnPlateau(
+                monitor='val_loss',
+                factor=0.5,
+                patience=3,
+                min_lr=1e-7,
+                verbose=1
+            )
+        ]
+        
+        print(f"\nTraining {model_name}...")
+        start_time = time.time()
+        
+        history = model.fit(
+            X_train_prepared, y_train,
+            validation_data=(X_val_prepared, y_val),
+            epochs=self.config['epochs'],
+            batch_size=self.config['batch_size'],
+            callbacks=callbacks,
+            verbose=1
+        )
+        
+        training_time = time.time() - start_time
+        
+        print(f"\nTraining complete in {training_time:.2f} seconds")
+        
+        model_info = {
+            'model_name': model_name,
+            'training_time': training_time,
+            'total_parameters': model.count_params(),
+            'input_shape': str(X_train_prepared.shape[1:]),
+            'epochs_trained': len(history.history['loss']),
+            'best_val_loss': float(np.min(history.history['val_loss'])),
+            'best_val_accuracy': float(np.max(history.history['val_accuracy'])),
+        }
+        
+        return model, history, model_info
+    
+    def save_model(self, model, model_name, model_info, history, save_dir=None):
+        """Save trained model"""
+        if save_dir is None:
+            save_dir = f"{self.config['models_dir']}/deep_learning"
+        
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        model_path = f"{save_dir}/{model_name}.h5"
+        model.save(model_path)
+        print(f"Model saved: {model_path}")
+        
+        weights_path = f"{save_dir}/{model_name}_weights.h5"
+        model.save_weights(weights_path)
+        print(f"Weights saved: {weights_path}")
+        
+        metadata_path = f"{save_dir}/{model_name}_metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(model_info, f, indent=2)
+        print(f"Metadata saved: {metadata_path}")
+        
+        history_path = f"{save_dir}/{model_name}_history.json"
+        history_dict = {k: [float(v) for v in vals] for k, vals in history.history.items()}
+        with open(history_path, 'w') as f:
+            json.dump(history_dict, f, indent=2)
+        print(f"History saved: {history_path}")
+    
+    def train_all_deep_learning_models(self, X_train, y_train, X_val, y_val, 
+                                       feature_type='uniembed'):
+        """Train all deep learning models"""
+        
+        print(f"\n{'='*70}")
+        print(f"TRAINING ALL DEEP LEARNING MODELS")
+        print(f"Feature Type: {feature_type.upper()}")
+        print(f"{'='*70}\n")
+        
+        trained_models = {}
+        
+        for model_name in DEEP_LEARNING_MODELS:
+            try:
+                model, history, model_info = self.train_model(
+                    model_name, X_train, y_train, X_val, y_val
+                )
+                
+                model_info['feature_type'] = feature_type
+                
+                self.save_model(model, model_name, model_info, history)
+                
+                trained_models[model_name] = {
+                    'model': model,
+                    'history': history,
+                    'info': model_info
+                }
+                
+                print(f"{model_name} complete!\n")
+                
+                # MEMORY OPTIMIZATION: Clear memory
+                del model
+                keras.backend.clear_session()
+                gc.collect()
+                
+                if self.config.get('clear_memory_after_model', True):
+                    clear_memory()
+                
+            except Exception as e:
+                print(f"Error training {model_name}: {str(e)}\n")
+                keras.backend.clear_session()
+                continue
+        
+        print(f"\n{'='*70}")
+        print(f"ALL DEEP LEARNING MODELS TRAINED: {len(trained_models)}/{len(DEEP_LEARNING_MODELS)}")
+        print(f"{'='*70}\n")
+        
+        return trained_models
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    from config import GLOBAL_CONFIG, set_seed
+    
+    set_seed(GLOBAL_CONFIG['random_seed'])
+    
+    feature_dir = f"{GLOBAL_CONFIG['base_dir']}/features"
+    X_train = np.load(f"{feature_dir}/X_train_uniembed.npy")
+    X_val = np.load(f"{feature_dir}/X_val_uniembed.npy")
+    X_test = np.load(f"{feature_dir}/X_test_uniembed.npy")
+    
+    data_dir = f"{GLOBAL_CONFIG['base_dir']}/data"
+    y_train = np.load(f"{data_dir}/y_train.npy")
+    y_val = np.load(f"{data_dir}/y_val.npy")
+    y_test = np.load(f"{data_dir}/y_test.npy")
+    
+    trainer = DeepLearningTrainer(GLOBAL_CONFIG)
+    trained_models = trainer.train_all_deep_learning_models(
+        X_train, y_train, X_val, y_val, feature_type='uniembed'
+    )
+    
+    print("Deep learning training complete!")
+
+
+# ============================================================================
+# FILE: 07_models_gnn.py
+# DESCRIPTION: Graph Neural Network models (6 models)
+# ============================================================================
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.data import Data, DataLoader
+from torch_geometric.nn import (
+    GCNConv, GATConv, SAGEConv, 
+    TransformerConv, GatedGraphConv,
+    global_mean_pool, global_max_pool
+)
+import networkx as nx
+from pathlib import Path
+from config import GLOBAL_CONFIG, set_seed, GNN_MODELS
+from gensim.models import Word2Vec
+    
+    
+import time
+import json
+import pickle
+
+# ============================================================================
+# GRAPH CONSTRUCTION
+# ============================================================================
+
+class GraphConstructor:
+    """
+    Construct graph representations from text queries
+    Following Algorithm 2 from methodology
+    """
+    
+    def __init__(self, word2vec_model=None):
+        self.word2vec_model = word2vec_model
+        
+    def text_to_graph(self, text, label):
+        """
+        Convert text to graph representation
+        
+        Node features:
+        - Token embeddings (Word2Vec 100D)
+        - One-hot node type (4D: token/syntax/semantic/structure)
+        - Positional encoding (1D)
+        - Attack indicator (1D)
+        - Token frequency (1D)
+        Total: 107D per node
+        
+        Returns:
+            PyTorch Geometric Data object
+        """
+        tokens = text.split()
+        
+        if len(tokens) == 0:
+            tokens = ['<EMPTY>']
+        
+        # Create NetworkX graph for structure
+        G = nx.Graph()
+        
+        # Add nodes with features
+        node_features = []
+        for i, token in enumerate(tokens):
+            # Token embedding (100D)
+            if self.word2vec_model and token in self.word2vec_model.wv:
+                token_emb = self.word2vec_model.wv[token]
+            else:
+                token_emb = np.zeros(100)
+            
+            # Node type (4D one-hot): token, syntax, semantic, structure
+            node_type = self._get_node_type(token)
+            
+            # Positional encoding (normalized)
+            pos_encoding = i / len(tokens)
+            
+            # Attack indicator (heuristic)
+            attack_indicator = 1.0 if self._is_attack_token(token) else 0.0
+            
+            # Token frequency
+            token_freq = tokens.count(token) / len(tokens)
+            
+            # Combine features
+            node_feat = np.concatenate([
+                token_emb,
+                node_type,
+                [pos_encoding],
+                [attack_indicator],
+                [token_freq]
+            ])
+            
+            node_features.append(node_feat)
+            G.add_node(i, token=token)
+        
+        # Add edges (sequential + semantic)
+        edge_index = []
+        edge_attr = []
+        
+        # Sequential edges
+        for i in range(len(tokens) - 1):
+            edge_index.append([i, i + 1])
+            edge_attr.append([1.0, 0.0, 1.0])  # [type: sequential, weight, distance]
+            
+            edge_index.append([i + 1, i])  # Bidirectional
+            edge_attr.append([1.0, 0.0, 1.0])
+        
+        # Semantic edges (connect similar tokens)
+        if self.word2vec_model:
+            for i in range(len(tokens)):
+                for j in range(i + 1, len(tokens)):
+                    if i != j and tokens[i] in self.word2vec_model.wv and tokens[j] in self.word2vec_model.wv:
+                        similarity = self.word2vec_model.wv.similarity(tokens[i], tokens[j])
+                        if similarity > 0.7:  # Threshold
+                            edge_index.append([i, j])
+                            edge_attr.append([0.0, 1.0, similarity])  # [sequential, semantic, weight]
+                            
+                            edge_index.append([j, i])
+                            edge_attr.append([0.0, 1.0, similarity])
+        
+        # Convert to PyTorch tensors
+        x = torch.tensor(node_features, dtype=torch.float)
+        
+        if len(edge_index) > 0:
+            edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+            edge_attr = torch.tensor(edge_attr, dtype=torch.float)
+        else:
+            # Self-loop if no edges
+            edge_index = torch.tensor([[0], [0]], dtype=torch.long)
+            edge_attr = torch.tensor([[1.0, 0.0, 1.0]], dtype=torch.float)
+        
+        y = torch.tensor([label], dtype=torch.long)
+        
+        # Create PyG Data object
+        data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y)
+        
+        return data
+    
+    def _get_node_type(self, token):
+        """Determine node type (one-hot encoded)"""
+        sql_keywords = {'<SQL_SELECT>', '<SQL_INSERT>', '<SQL_UPDATE>', '<SQL_DELETE>', 
+                       '<SQL_DROP>', '<SQL_UNION>', '<SQL_WHERE>', '<SQL_AND>', '<SQL_OR>'}
+        xss_keywords = {'<XSS_SCRIPT>', '<XSS_IFRAME>', '<XSS_ONERROR>', '<XSS_ONLOAD>', 
+                       '<XSS_ALERT>', '<XSS_IMG>'}
+        special_chars = {'<SQUOTE>', '<DQUOTE>', '<SEMICOLON>', '<EQUALS>', '<LT>', '<GT>'}
+        
+        if token in sql_keywords or token in xss_keywords:
+            return np.array([0, 1, 0, 0])  # syntax
+        elif token in special_chars:
+            return np.array([0, 0, 0, 1])  # structure
+        elif token.startswith('<') and token.endswith('>'):
+            return np.array([0, 0, 1, 0])  # semantic
+        else:
+            return np.array([1, 0, 0, 0])  # token
+    
+    def _is_attack_token(self, token):
+        """Heuristic to identify attack-related tokens"""
+        attack_indicators = {
+            '<SQL_', '<XSS_', '<SQUOTE>', '<DQUOTE>', '<SEMICOLON>', 
+            '<COMMENT>', '<UNION>', '<SCRIPT>', '<ALERT>'
+        }
+        return any(ind in token for ind in attack_indicators)
+    
+    def texts_to_graphs(self, texts, labels):
+        """Convert multiple texts to graphs"""
+        print(" Converting texts to graphs...")
+        graphs = []
+        
+        for i, (text, label) in enumerate(zip(texts, labels)):
+            graph = self.text_to_graph(text, label)
+            graphs.append(graph)
+            
+            if (i + 1) % 1000 == 0:
+                print(f"   Processed {i + 1}/{len(texts)} graphs")
+        
+        print(f" Created {len(graphs)} graphs")
+        return graphs
+
+# ============================================================================
+# GNN MODEL ARCHITECTURES
+# ============================================================================
+
+class GCN(nn.Module):
+    """Graph Convolutional Network"""
+    
+    def __init__(self, input_dim, hidden_dims=[128, 64, 32], num_classes=2, dropout=0.3):
+        super(GCN, self).__init__()
+        
+        self.convs = nn.ModuleList()
+        self.bns = nn.ModuleList()
+        
+        # First layer
+        self.convs.append(GCNConv(input_dim, hidden_dims[0]))
+        self.bns.append(nn.BatchNorm1d(hidden_dims[0]))
+        
+        # Hidden layers
+        for i in range(len(hidden_dims) - 1):
+            self.convs.append(GCNConv(hidden_dims[i], hidden_dims[i + 1]))
+            self.bns.append(nn.BatchNorm1d(hidden_dims[i + 1]))
+        
+        # Classifier
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden_dims[-1] * 2, 64),  # *2 for mean+max pooling
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(64, num_classes)
+        )
+        
+        self.dropout = dropout
+    
+    def forward(self, data):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        
+        # Graph convolution layers
+        for i, (conv, bn) in enumerate(zip(self.convs, self.bns)):
+            x = conv(x, edge_index)
+            x = bn(x)
+            x = F.relu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        
+        # Global pooling
+        x_mean = global_mean_pool(x, batch)
+        x_max = global_max_pool(x, batch)
+        x = torch.cat([x_mean, x_max], dim=1)
+        
+        # Classification
+        x = self.classifier(x)
+        
+        return x
+
+
+class GAT(nn.Module):
+    """Graph Attention Network"""
+    
+    def __init__(self, input_dim, hidden_dims=[128, 64, 32], num_classes=2, 
+                 heads=8, dropout=0.3, attention_dropout=0.2):
+        super(GAT, self).__init__()
+        
+        self.convs = nn.ModuleList()
+        self.bns = nn.ModuleList()
+        
+        # First layer (multi-head)
+        self.convs.append(GATConv(input_dim, hidden_dims[0], heads=heads, 
+                                  dropout=attention_dropout))
+        self.bns.append(nn.BatchNorm1d(hidden_dims[0] * heads))
+        
+        # Hidden layers
+        for i in range(len(hidden_dims) - 1):
+            in_dim = hidden_dims[i] * heads if i == 0 else hidden_dims[i]
+            self.convs.append(GATConv(in_dim, hidden_dims[i + 1], heads=1, 
+                                     dropout=attention_dropout))
+            self.bns.append(nn.BatchNorm1d(hidden_dims[i + 1]))
+        
+        # Classifier
+        final_dim = hidden_dims[-1]
+        self.classifier = nn.Sequential(
+            nn.Linear(final_dim * 2, 64),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(64, num_classes)
+        )
+        
+        self.dropout = dropout
+    
+    def forward(self, data):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        
+        # Graph attention layers
+        for i, (conv, bn) in enumerate(zip(self.convs, self.bns)):
+            x = conv(x, edge_index)
+            x = bn(x)
+            x = F.elu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        
+        # Global pooling
+        x_mean = global_mean_pool(x, batch)
+        x_max = global_max_pool(x, batch)
+        x = torch.cat([x_mean, x_max], dim=1)
+        
+        # Classification
+        x = self.classifier(x)
+        
+        return x
+
+
+class GraphSAGE(nn.Module):
+    """GraphSAGE with sample and aggregate"""
+    
+    def __init__(self, input_dim, hidden_dims=[128, 64, 32], num_classes=2, dropout=0.3):
+        super(GraphSAGE, self).__init__()
+        
+        self.convs = nn.ModuleList()
+        self.bns = nn.ModuleList()
+        
+        # First layer
+        self.convs.append(SAGEConv(input_dim, hidden_dims[0]))
+        self.bns.append(nn.BatchNorm1d(hidden_dims[0]))
+        
+        # Hidden layers
+        for i in range(len(hidden_dims) - 1):
+            self.convs.append(SAGEConv(hidden_dims[i], hidden_dims[i + 1]))
+            self.bns.append(nn.BatchNorm1d(hidden_dims[i + 1]))
+        
+        # Classifier
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden_dims[-1] * 2, 64),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(64, num_classes)
+        )
+        
+        self.dropout = dropout
+    
+    def forward(self, data):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        
+        # GraphSAGE layers
+        for i, (conv, bn) in enumerate(zip(self.convs, self.bns)):
+            x = conv(x, edge_index)
+            x = bn(x)
+            x = F.relu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        
+        # Global pooling
+        x_mean = global_mean_pool(x, batch)
+        x_max = global_max_pool(x, batch)
+        x = torch.cat([x_mean, x_max], dim=1)
+        
+        # Classification
+        x = self.classifier(x)
+        
+        return x
+
+
+class GraphTransformer(nn.Module):
+    """Graph Transformer with positional encodings"""
+    
+    def __init__(self, input_dim, hidden_dims=[128, 64, 32], num_classes=2, 
+                 heads=8, dropout=0.3):
+        super(GraphTransformer, self).__init__()
+        
+        self.convs = nn.ModuleList()
+        self.bns = nn.ModuleList()
+        
+        # Transformer layers
+        for i, hidden_dim in enumerate(hidden_dims):
+            in_dim = input_dim if i == 0 else hidden_dims[i - 1]
+            self.convs.append(TransformerConv(in_dim, hidden_dim, heads=heads, 
+                                             dropout=dropout))
+            self.bns.append(nn.BatchNorm1d(hidden_dim * heads if i == 0 else hidden_dim))
+        
+        # Classifier
+        final_dim = hidden_dims[-1]
+        self.classifier = nn.Sequential(
+            nn.Linear(final_dim * 2, 64),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(64, num_classes)
+        )
+        
+        self.dropout = dropout
+    
+    def forward(self, data):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        
+        # Transformer layers
+        for i, (conv, bn) in enumerate(zip(self.convs, self.bns)):
+            x = conv(x, edge_index)
+            x = bn(x)
+            x = F.relu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        
+        # Global pooling
+        x_mean = global_mean_pool(x, batch)
+        x_max = global_max_pool(x, batch)
+        x = torch.cat([x_mean, x_max], dim=1)
+        
+        # Classification
+        x = self.classifier(x)
+        
+        return x
+
+
+class GGNN(nn.Module):
+    """Gated Graph Neural Network"""
+    
+    def __init__(self, input_dim, hidden_dim=128, num_classes=2, 
+                 num_layers=5, dropout=0.3):
+        super(GGNN, self).__init__()
+        
+        self.ggnn = GatedGraphConv(hidden_dim, num_layers)
+        self.input_proj = nn.Linear(input_dim, hidden_dim)
+        
+        # Classifier
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden_dim * 2, 64),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(64, num_classes)
+        )
+        
+        self.dropout = dropout
+    
+    def forward(self, data):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        
+        # Project to hidden dimension
+        x = self.input_proj(x)
+        
+        # GGNN layers
+        x = self.ggnn(x, edge_index)
+        x = F.relu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        
+        # Global pooling
+        x_mean = global_mean_pool(x, batch)
+        x_max = global_max_pool(x, batch)
+        x = torch.cat([x_mean, x_max], dim=1)
+        
+        # Classification
+        x = self.classifier(x)
+        
+        return x
+
+
+class GCN_LSTM(nn.Module):
+    """Hybrid GCN-LSTM model"""
+    
+    def __init__(self, input_dim, hidden_dims=[128, 64], lstm_hidden=128, 
+                 num_classes=2, dropout=0.3):
+        super(GCN_LSTM, self).__init__()
+        
+        # GCN layers
+        self.conv1 = GCNConv(input_dim, hidden_dims[0])
+        self.bn1 = nn.BatchNorm1d(hidden_dims[0])
+        self.conv2 = GCNConv(hidden_dims[0], hidden_dims[1])
+        self.bn2 = nn.BatchNorm1d(hidden_dims[1])
+        
+        # LSTM layer
+        self.lstm = nn.LSTM(hidden_dims[1], lstm_hidden, batch_first=True, 
+                           bidirectional=True)
+        
+        # Classifier
+        self.classifier = nn.Sequential(
+            nn.Linear(lstm_hidden * 2 * 2, 64),  # *2 for bidirectional, *2 for pooling
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(64, num_classes)
+        )
+        
+        self.dropout = dropout
+    
+    def forward(self, data):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        
+        # GCN layers
+        x = self.conv1(x, edge_index)
+        x = self.bn1(x)
+        x = F.relu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        
+        x = self.conv2(x, edge_index)
+        x = self.bn2(x)
+        x = F.relu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        
+        # Reshape for LSTM (group by batch)
+        batch_size = batch.max().item() + 1
+        node_features_list = []
+        
+        for i in range(batch_size):
+            mask = (batch == i)
+            node_features = x[mask].unsqueeze(0)  # (1, num_nodes, hidden_dim)
+            node_features_list.append(node_features)
+        
+        # Pad sequences
+        max_nodes = max(nf.size(1) for nf in node_features_list)
+        padded_features = torch.zeros(batch_size, max_nodes, x.size(1), device=x.device)
+        
+        for i, nf in enumerate(node_features_list):
+            padded_features[i, :nf.size(1), :] = nf
+        
+        # LSTM
+        lstm_out, _ = self.lstm(padded_features)
+        
+        # Pool LSTM output
+        lstm_mean = lstm_out.mean(dim=1)
+        lstm_max = lstm_out.max(dim=1)[0]
+        x = torch.cat([lstm_mean, lstm_max], dim=1)
+        
+        # Classification
+        x = self.classifier(x)
+        
+        return x
+
+
+# ============================================================================
+# GNN TRAINER
+# ============================================================================
+
+class GNNTrainer:
+    """Train and evaluate GNN models"""
+    
+    def __init__(self, config=GLOBAL_CONFIG):
+        self.config = config
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    def create_model(self, model_name, input_dim):
+        """Create GNN model by name"""
+        
+        models = {
+            'GCN': GCN(input_dim, self.config['gnn_hidden_dims'], dropout=self.config['gnn_dropout']),
+            'GAT': GAT(input_dim, self.config['gnn_hidden_dims'], heads=self.config['gat_heads'], 
+                      dropout=self.config['gnn_dropout']),
+            'GraphSAGE': GraphSAGE(input_dim, self.config['gnn_hidden_dims'], 
+                                   dropout=self.config['gnn_dropout']),
+            'Graph_Transformer': GraphTransformer(input_dim, self.config['gnn_hidden_dims'], 
+                                                  dropout=self.config['gnn_dropout']),
+            'GGNN': GGNN(input_dim, hidden_dim=128, dropout=self.config['gnn_dropout']),
+            'GCN_LSTM': GCN_LSTM(input_dim, hidden_dims=[128, 64], 
+                                dropout=self.config['gnn_dropout'])
+        }
+        
+        if model_name not in models:
+            raise ValueError(f"Unknown model: {model_name}")
+        
+        return models[model_name].to(self.device)
+    
+    def train_epoch(self, model, train_loader, optimizer):
+        """Train for one epoch"""
+        model.train()
+        total_loss = 0
+        correct = 0
+        total = 0
+        
+        for data in train_loader:
+            data = data.to(self.device)
+            optimizer.zero_grad()
+            
+            out = model(data)
+            loss = F.cross_entropy(out, data.y)
+            
+            loss.backward()
+            optimizer.step()
+            
+            total_loss += loss.item() * data.num_graphs
+            pred = out.argmax(dim=1)
+            correct += (pred == data.y).sum().item()
+            total += data.num_graphs
+        
+        avg_loss = total_loss / total
+        accuracy = correct / total
+        
+        return avg_loss, accuracy
+    
+    def evaluate(self, model, loader):
+        """Evaluate model"""
+        model.eval()
+        total_loss = 0
+        correct = 0
+        total = 0
+        
+        with torch.no_grad():
+            for data in loader:
+                data = data.to(self.device)
+                out = model(data)
+                loss = F.cross_entropy(out, data.y)
+                
+                total_loss += loss.item() * data.num_graphs
+                pred = out.argmax(dim=1)
+                correct += (pred == data.y).sum().item()
+                total += data.num_graphs
+        
+        avg_loss = total_loss / total
+        accuracy = correct / total
+        
+        return avg_loss, accuracy
+    
+    def train_model(self, model_name, train_graphs, val_graphs):
+        """
+        Train a GNN model
+        
+        Returns:
+            Trained model, training info
+        """
+        print(f"\n{'='*70}")
+        print(f"TRAINING: {model_name}")
+        print(f"{'='*70}\n")
+        
+        # Create data loaders
+        train_loader = DataLoader(train_graphs, batch_size=self.config['batch_size'], 
+                                 shuffle=True)
+        val_loader = DataLoader(val_graphs, batch_size=self.config['batch_size'], 
+                               shuffle=False)
+        
+        print(f"   Train graphs: {len(train_graphs)}")
+        print(f"   Val graphs: {len(val_graphs)}")
+        print(f"   Node feature dim: {train_graphs[0].x.shape[1]}")
+        
+        # Create model
+        input_dim = train_graphs[0].x.shape[1]
+        model = self.create_model(model_name, input_dim)
+        
+        print(f"\n Model: {model_name}")
+        print(f"   Parameters: {sum(p.numel() for p in model.parameters())}")
+        
+        # Optimizer
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.config['gnn_lr'])
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode='min', factor=0.5, patience=5
+        )
+        
+        # Training loop
+        print(f"\n Training for {self.config['gnn_epochs']} epochs...")
+        
+        history = {
+            'train_loss': [],
+            'train_accuracy': [],
+            'val_loss': [],
+            'val_accuracy': []
+        }
+        
+        best_val_loss = float('inf')
+        patience_counter = 0
+        start_time = time.time()
+        
+        for epoch in range(self.config['gnn_epochs']):
+            # Train
+            train_loss, train_acc = self.train_epoch(model, train_loader, optimizer)
+            history['train_loss'].append(train_loss)
+            history['train_accuracy'].append(train_acc)
+            
+            # Validate
+            val_loss, val_acc = self.evaluate(model, val_loader)
+            history['val_loss'].append(val_loss)
+            history['val_accuracy'].append(val_acc)
+            
+            # Update scheduler
+            scheduler.step(val_loss)
+            
+            if (epoch + 1) % 5 == 0:
+                print(f"Epoch {epoch + 1}/{self.config['gnn_epochs']}: "
+                      f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, "
+                      f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
+            
+            # Early stopping
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                patience_counter = 0
+            else:
+                patience_counter += 1
+                if patience_counter >= self.config['early_stopping_patience']:
+                    print(f"Early stopping at epoch {epoch + 1}")
+                    break
+        
+        training_time = time.time() - start_time
+        
+        print(f"\n Training complete in {training_time:.2f} seconds")
+        
+        # Model info
+        model_info = {
+            'model_name': model_name,
+            'training_time': training_time,
+            'total_parameters': sum(p.numel() for p in model.parameters()),
+            'epochs_trained': len(history['train_loss']),
+            'best_val_loss': float(best_val_loss),
+            'best_val_accuracy': float(np.max(history['val_accuracy'])),
+        }
+        
+        return model, history, model_info
+    
+    def save_model(self, model, model_name, model_info, history, save_dir=None):
+        """Save GNN model"""
+        if save_dir is None:
+            save_dir = f"{self.config['models_dir']}/gnn"
+        
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Save model state
+        model_path = f"{save_dir}/{model_name}.pt"
+        torch.save(model.state_dict(), model_path)
+        print(f" Model saved: {model_path}")
+        
+        # Save metadata
+        metadata_path = f"{save_dir}/{model_name}_metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(model_info, f, indent=2)
+        print(f" Metadata saved: {metadata_path}")
+        
+        # Save history
+        history_path = f"{save_dir}/{model_name}_history.json"
+        with open(history_path, 'w') as f:
+            json.dump(history, f, indent=2)
+        print(f" History saved: {history_path}")
+    
+    def train_all_gnn_models(self, train_graphs, val_graphs):
+        """Train all GNN models"""
+        print(f"\n{'='*70}")
+        print(f"TRAINING ALL GNN MODELS")
+        print(f"{'='*70}\n")
+        
+        trained_models = {}
+        
+        for model_name in GNN_MODELS:
+            try:
+                # Train model
+                model, history, model_info = self.train_model(
+                    model_name, train_graphs, val_graphs
+                )
+                
+                # Save model
+                self.save_model(model, model_name, model_info, history)
+                
+                # Store
+                trained_models[model_name] = {
+                    'model': model,
+                    'history': history,
+                    'info': model_info
+                }
+                
+                print(f" {model_name} complete!\n")
+                
+                # Clear CUDA cache
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                
+            except Exception as e:
+                print(f" Error training {model_name}: {str(e)}\n")
+                continue
+        
+        print(f"\n{'='*70}")
+        print(f" ALL GNN MODELS TRAINED: {len(trained_models)}/{len(GNN_MODELS)}")
+        print(f"{'='*70}\n")
+        
+        return trained_models
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+
+    
+    set_seed(GLOBAL_CONFIG['random_seed'])
+    
+    # Load Word2Vec model for graph construction
+    feature_dir = f"{GLOBAL_CONFIG['base_dir']}/features"
+    word2vec_model = Word2Vec.load(f"{feature_dir}/word2vec.model")
+    
+    # Load text data
+    data_dir = f"{GLOBAL_CONFIG['base_dir']}/data"
+    X_train = np.load(f"{data_dir}/X_train.npy", allow_pickle=True)
+    X_val = np.load(f"{data_dir}/X_val.npy", allow_pickle=True)
+    X_test = np.load(f"{data_dir}/X_test.npy", allow_pickle=True)
+    
+    y_train = np.load(f"{data_dir}/y_train.npy")
+    y_val = np.load(f"{data_dir}/y_val.npy")
+    y_test = np.load(f"{data_dir}/y_test.npy")
+    
+    # Construct graphs
+    constructor = GraphConstructor(word2vec_model)
+    
+    print("\n Constructing training graphs...")
+    train_graphs = constructor.texts_to_graphs(X_train, y_train)
+    
+    print("\n Constructing validation graphs...")
+    val_graphs = constructor.texts_to_graphs(X_val, y_val)
+    
+    print("\n Constructing test graphs...")
+    test_graphs = constructor.texts_to_graphs(X_test, y_test)
+    
+    # Save graphs
+    print("\n Saving graphs...")
+    with open(f"{data_dir}/train_graphs.pkl", 'wb') as f:
+        pickle.dump(train_graphs, f)
+    with open(f"{data_dir}/val_graphs.pkl", 'wb') as f:
+        pickle.dump(val_graphs, f)
+    with open(f"{data_dir}/test_graphs.pkl", 'wb') as f:
+        pickle.dump(test_graphs, f)
+    
+    # Train all GNN models
+    trainer = GNNTrainer(GLOBAL_CONFIG)
+    trained_models = trainer.train_all_gnn_models(train_graphs, val_graphs)
+    
+    print(" GNN training complete!")
+
+
+# ============================================================================
+# FILE: 08_models_hybrid.py
+# DESCRIPTION: Hybrid ensemble models (5 models)
+# ============================================================================
+
+import numpy as np
+import joblib
+import torch
+from sklearn.ensemble import VotingClassifier, StackingClassifier
+from sklearn.linear_model import LogisticRegression
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
+import tensorflow as tf
+from tensorflow import keras
+import time
+import json
+from pathlib import Path
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from config import GLOBAL_CONFIG, set_seed, HYBRID_MODELS
+# ============================================================================
+# LIGHTGBM-BILSTM TWO-TIER HYBRID
+# ============================================================================
+
+class LightGBM_BiLSTM_Hybrid:
+    """
+    Two-tier hybrid model:
+    - Tier 1: LightGBM handles high-confidence predictions (p > 0.9)
+    - Tier 2: BiLSTM processes ambiguous cases
+    """
+    
+    def __init__(self, config=GLOBAL_CONFIG):
+        self.config = config
+        self.confidence_threshold = 0.9
+        self.lightgbm_model = None
+        self.bilstm_model = None
+        
+    def create_lightgbm(self):
+        """Create LightGBM classifier"""
+        return LGBMClassifier(
+            n_estimators=300,
+            learning_rate=0.1,
+            max_depth=6,
+            num_leaves=31,
+            random_state=self.config['random_seed'],
+            n_jobs=self.config['n_jobs']
+        )
+    
+    def create_bilstm(self, input_dim):
+        """Create BiLSTM model"""
+        timesteps = min(input_dim, 50)
+        features_per_timestep = input_dim // timesteps
+        
+        model = keras.Sequential([
+            keras.layers.Input(shape=(timesteps, features_per_timestep)),
+            keras.layers.Bidirectional(keras.layers.LSTM(128, return_sequences=True)),
+            keras.layers.Dropout(0.3),
+            keras.layers.Bidirectional(keras.layers.LSTM(64)),
+            keras.layers.Dropout(0.3),
+            keras.layers.Dense(128, activation='relu'),
+            keras.layers.Dropout(0.3),
+            keras.layers.Dense(1, activation='sigmoid')
+        ], name='BiLSTM_Tier2')
+        
+        model.compile(
+            optimizer=keras.optimizers.Adam(learning_rate=self.config['learning_rate']),
+            loss='binary_crossentropy',
+            metrics=['accuracy']
+        )
+        
+        return model
+    
+    def prepare_bilstm_data(self, X):
+        """Reshape data for BiLSTM"""
+        n_features = X.shape[1]
+        timesteps = min(n_features, 50)
+        features_per_timestep = n_features // timesteps
+        truncated_features = timesteps * features_per_timestep
+        X_truncated = X[:, :truncated_features]
+        return X_truncated.reshape(X.shape[0], timesteps, features_per_timestep)
+    
+    def fit(self, X_train, y_train, X_val=None, y_val=None):
+        """Train the two-tier hybrid model"""
+        print("\n Training Tier 1: LightGBM...")
+        
+        # Train LightGBM
+        self.lightgbm_model = self.create_lightgbm()
+        self.lightgbm_model.fit(X_train, y_train)
+        
+        # Get LightGBM predictions on training data
+        train_proba = self.lightgbm_model.predict_proba(X_train)
+        train_confidence = np.max(train_proba, axis=1)
+        
+        # Identify ambiguous samples (low confidence)
+        ambiguous_mask = train_confidence < self.confidence_threshold
+        X_train_ambiguous = X_train[ambiguous_mask]
+        y_train_ambiguous = y_train[ambiguous_mask]
+        
+        print(f"   High-confidence samples: {np.sum(~ambiguous_mask)} ({np.sum(~ambiguous_mask)/len(y_train)*100:.1f}%)")
+        print(f"   Ambiguous samples: {np.sum(ambiguous_mask)} ({np.sum(ambiguous_mask)/len(y_train)*100:.1f}%)")
+        
+        # Train BiLSTM on ambiguous cases
+        if np.sum(ambiguous_mask) > 0:
+            print("\n Training Tier 2: BiLSTM on ambiguous cases...")
+            
+            self.bilstm_model = self.create_bilstm(X_train.shape[1])
+            
+            X_train_bilstm = self.prepare_bilstm_data(X_train_ambiguous)
+            
+            if X_val is not None and y_val is not None:
+                val_proba = self.lightgbm_model.predict_proba(X_val)
+                val_confidence = np.max(val_proba, axis=1)
+                val_ambiguous_mask = val_confidence < self.confidence_threshold
+                
+                if np.sum(val_ambiguous_mask) > 0:
+                    X_val_ambiguous = X_val[val_ambiguous_mask]
+                    y_val_ambiguous = y_val[val_ambiguous_mask]
+                    X_val_bilstm = self.prepare_bilstm_data(X_val_ambiguous)
+                    
+                    self.bilstm_model.fit(
+                        X_train_bilstm, y_train_ambiguous,
+                        validation_data=(X_val_bilstm, y_val_ambiguous),
+                        epochs=self.config['epochs'],
+                        batch_size=self.config['batch_size'],
+                        callbacks=[
+                            keras.callbacks.EarlyStopping(patience=10, restore_best_weights=True)
+                        ],
+                        verbose=1
+                    )
+                else:
+                    self.bilstm_model.fit(
+                        X_train_bilstm, y_train_ambiguous,
+                        epochs=self.config['epochs'],
+                        batch_size=self.config['batch_size'],
+                        callbacks=[
+                            keras.callbacks.EarlyStopping(patience=10, restore_best_weights=True)
+                        ],
+                        verbose=1
+                    )
+            else:
+                self.bilstm_model.fit(
+                    X_train_bilstm, y_train_ambiguous,
+                    epochs=self.config['epochs'],
+                    batch_size=self.config['batch_size'],
+                    verbose=1
+                )
+        
+        print(" Two-tier hybrid model trained!")
+        
+        return self
+    
+    def predict(self, X):
+        """Predict using two-tier approach"""
+        predictions = np.zeros(len(X))
+        
+        # Tier 1: LightGBM predictions
+        lgbm_proba = self.lightgbm_model.predict_proba(X)
+        lgbm_confidence = np.max(lgbm_proba, axis=1)
+        lgbm_predictions = self.lightgbm_model.predict(X)
+        
+        # High confidence: use LightGBM
+        high_conf_mask = lgbm_confidence >= self.confidence_threshold
+        predictions[high_conf_mask] = lgbm_predictions[high_conf_mask]
+        
+        # Low confidence: use BiLSTM if available
+        if self.bilstm_model is not None and np.sum(~high_conf_mask) > 0:
+            X_ambiguous = X[~high_conf_mask]
+            X_ambiguous_bilstm = self.prepare_bilstm_data(X_ambiguous)
+            bilstm_proba = self.bilstm_model.predict(X_ambiguous_bilstm, verbose=0)
+            predictions[~high_conf_mask] = (bilstm_proba.flatten() > 0.5).astype(int)
+        else:
+            predictions[~high_conf_mask] = lgbm_predictions[~high_conf_mask]
+        
+        return predictions.astype(int)
+    
+    def predict_proba(self, X):
+        """Predict probabilities using two-tier approach"""
+        proba = np.zeros((len(X), 2))
+        
+        # Tier 1: LightGBM predictions
+        lgbm_proba = self.lightgbm_model.predict_proba(X)
+        lgbm_confidence = np.max(lgbm_proba, axis=1)
+        
+        # High confidence: use LightGBM
+        high_conf_mask = lgbm_confidence >= self.confidence_threshold
+        proba[high_conf_mask] = lgbm_proba[high_conf_mask]
+        
+        # Low confidence: use BiLSTM if available
+        if self.bilstm_model is not None and np.sum(~high_conf_mask) > 0:
+            X_ambiguous = X[~high_conf_mask]
+            X_ambiguous_bilstm = self.prepare_bilstm_data(X_ambiguous)
+            bilstm_proba = self.bilstm_model.predict(X_ambiguous_bilstm, verbose=0).flatten()
+            proba[~high_conf_mask, 1] = bilstm_proba
+            proba[~high_conf_mask, 0] = 1 - bilstm_proba
+        else:
+            proba[~high_conf_mask] = lgbm_proba[~high_conf_mask]
+        
+        return proba
+
+# ============================================================================
+# STACKING ENSEMBLE
+# ============================================================================
+
+class StackingEnsembleFactory:
+    """Create stacking ensemble with multiple base learners"""
+    
+    def __init__(self, config=GLOBAL_CONFIG):
+        self.config = config
+    
+    def create_stacking_ensemble(self):
+        """
+        Create stacking ensemble:
+        Base learners: XGBoost, SVM, Random Forest, MLP (converted), Extra Trees
+        Meta-learner: Logistic Regression
+        """
+        
+        
+        base_learners = [
+            ('xgboost', XGBClassifier(
+                n_estimators=300,
+                learning_rate=0.1,
+                max_depth=6,
+                random_state=self.config['random_seed'],
+                n_jobs=self.config['n_jobs']
+            )),
+            ('svm', SVC(
+                kernel='rbf',
+                C=1.0,
+                probability=True,
+                random_state=self.config['random_seed']
+            )),
+            ('random_forest', RandomForestClassifier(
+                n_estimators=100,
+                max_depth=15,
+                random_state=self.config['random_seed'],
+                n_jobs=self.config['n_jobs']
+            )),
+            ('extra_trees', ExtraTreesClassifier(
+                n_estimators=100,
+                max_depth=15,
+                random_state=self.config['random_seed'],
+                n_jobs=self.config['n_jobs']
+            ))
+        ]
+        
+        meta_learner = LogisticRegression(
+            max_iter=1000,
+            random_state=self.config['random_seed'],
+            n_jobs=self.config['n_jobs']
+        )
+        
+        stacking_model = StackingClassifier(
+            estimators=base_learners,
+            final_estimator=meta_learner,
+            cv=5,
+            n_jobs=self.config['n_jobs']
+        )
+        
+        return stacking_model
+
+# ============================================================================
+# VOTING CLASSIFIERS
+# ============================================================================
+
+class VotingEnsembleFactory:
+    """Create voting ensemble classifiers"""
+    
+    def __init__(self, config=GLOBAL_CONFIG):
+        self.config = config
+    
+    def create_voting_ensemble(self, voting='soft'):
+        """
+        Create voting ensemble
+        voting: 'soft' (probability-based) or 'hard' (majority voting)
+        """
+        
+        
+        estimators = [
+            ('logistic', LogisticRegression(
+                max_iter=1000,
+                random_state=self.config['random_seed']
+            )),
+            ('svm', SVC(
+                kernel='rbf',
+                probability=True,
+                random_state=self.config['random_seed']
+            )),
+            ('random_forest', RandomForestClassifier(
+                n_estimators=100,
+                random_state=self.config['random_seed'],
+                n_jobs=self.config['n_jobs']
+            )),
+            ('xgboost', XGBClassifier(
+                n_estimators=300,
+                learning_rate=0.1,
+                random_state=self.config['random_seed'],
+                n_jobs=self.config['n_jobs']
+            )),
+            ('gradient_boosting', GradientBoostingClassifier(
+                n_estimators=200,
+                random_state=self.config['random_seed']
+            ))
+        ]
+        
+        voting_model = VotingClassifier(
+            estimators=estimators,
+            voting=voting,
+            n_jobs=self.config['n_jobs']
+        )
+        
+        return voting_model
+
+# ============================================================================
+# BERT-XGBOOST HYBRID
+# ============================================================================
+
+class BERT_XGBoost_Hybrid:
+    """
+    Hybrid model:
+    - BERT extracts contextual embeddings
+    - XGBoost performs final classification
+    """
+    
+    def __init__(self, config=GLOBAL_CONFIG):
+        self.config = config
+        self.xgboost_model = None
+    
+    def fit(self, X_bert_embeddings, y_train):
+        """Train XGBoost on BERT embeddings"""
+        print("\n Training BERT-XGBoost Hybrid...")
+        print("   Using pre-computed BERT embeddings as features")
+        
+        self.xgboost_model = XGBClassifier(
+            n_estimators=300,
+            learning_rate=0.1,
+            max_depth=6,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            random_state=self.config['random_seed'],
+            n_jobs=self.config['n_jobs'],
+            eval_metric='logloss'
+        )
+        
+        self.xgboost_model.fit(X_bert_embeddings, y_train)
+        
+        print(" BERT-XGBoost Hybrid trained!")
+        
+        return self
+    
+    def predict(self, X_bert_embeddings):
+        """Predict using XGBoost on BERT embeddings"""
+        return self.xgboost_model.predict(X_bert_embeddings)
+    
+    def predict_proba(self, X_bert_embeddings):
+        """Predict probabilities"""
+        return self.xgboost_model.predict_proba(X_bert_embeddings)
+
+# ============================================================================
+# HYBRID TRAINER
+# ============================================================================
+
+class HybridModelTrainer:
+    """Train and evaluate hybrid ensemble models"""
+    
+    def __init__(self, config=GLOBAL_CONFIG):
+        self.config = config
+    
+    def train_hybrid_model(self, model_name, X_train, y_train, X_val=None, y_val=None, 
+                          X_bert_train=None, X_bert_val=None):
+        """
+        Train a hybrid model
+        
+        Returns:
+            Trained model, training info
+        """
+        print(f"\n{'='*70}")
+        print(f"TRAINING: {model_name}")
+        print(f"{'='*70}\n")
+        
+        start_time = time.time()
+        
+        if model_name == 'LightGBM_BiLSTM':
+            model = LightGBM_BiLSTM_Hybrid(self.config)
+            model.fit(X_train, y_train, X_val, y_val)
+            
+        elif model_name == 'Stacking_Ensemble':
+            factory = StackingEnsembleFactory(self.config)
+            model = factory.create_stacking_ensemble()
+            print(" Training stacking ensemble (this may take a while)...")
+            model.fit(X_train, y_train)
+            
+        elif model_name == 'Soft_Voting':
+            factory = VotingEnsembleFactory(self.config)
+            model = factory.create_voting_ensemble(voting='soft')
+            print(" Training soft voting ensemble...")
+            model.fit(X_train, y_train)
+            
+        elif model_name == 'Hard_Voting':
+            factory = VotingEnsembleFactory(self.config)
+            model = factory.create_voting_ensemble(voting='hard')
+            print(" Training hard voting ensemble...")
+            model.fit(X_train, y_train)
+            
+        elif model_name == 'BERT_XGBoost':
+            if X_bert_train is None:
+                raise ValueError("BERT embeddings required for BERT_XGBoost model")
+            model = BERT_XGBoost_Hybrid(self.config)
+            model.fit(X_bert_train, y_train)
+            
+        else:
+            raise ValueError(f"Unknown hybrid model: {model_name}")
+        
+        training_time = time.time() - start_time
+        
+        print(f" Training complete in {training_time:.2f} seconds")
+        
+        # Model info
+        model_info = {
+            'model_name': model_name,
+            'training_time': training_time,
+            'training_samples': X_train.shape[0],
+        }
+        
+        return model, model_info
+    
+    def save_model(self, model, model_name, model_info, save_dir=None):
+        """Save hybrid model"""
+        if save_dir is None:
+            save_dir = f"{self.config['models_dir']}/hybrid"
+        
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Save model
+        model_path = f"{save_dir}/{model_name}.pkl"
+        joblib.dump(model, model_path)
+        print(f" Model saved: {model_path}")
+        
+        # Save metadata
+        metadata_path = f"{save_dir}/{model_name}_metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(model_info, f, indent=2)
+        print(f" Metadata saved: {metadata_path}")
+    
+    def train_all_hybrid_models(self, X_train, y_train, X_val, y_val, 
+                               X_bert_train=None, X_bert_val=None):
+        """Train all hybrid models"""
+        print(f"\n{'='*70}")
+        print(f"TRAINING ALL HYBRID MODELS")
+        print(f"{'='*70}\n")
+        
+        trained_models = {}
+        
+        for model_name in HYBRID_MODELS:
+            try:
+                # Train model
+                if model_name == 'BERT_XGBoost':
+                    model, model_info = self.train_hybrid_model(
+                        model_name, X_train, y_train, X_val, y_val,
+                        X_bert_train, X_bert_val
+                    )
+                else:
+                    model, model_info = self.train_hybrid_model(
+                        model_name, X_train, y_train, X_val, y_val
+                    )
+                
+                # Save model
+                self.save_model(model, model_name, model_info)
+                
+                # Store
+                trained_models[model_name] = {
+                    'model': model,
+                    'info': model_info
+                }
+                
+                print(f" {model_name} complete!\n")
+                
+            except Exception as e:
+                print(f" Error training {model_name}: {str(e)}\n")
+                continue
+        
+        print(f"\n{'='*70}")
+        print(f" ALL HYBRID MODELS TRAINED: {len(trained_models)}/{len(HYBRID_MODELS)}")
+        print(f"{'='*70}\n")
+        
+        return trained_models
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    
+    
+    set_seed(GLOBAL_CONFIG['random_seed'])
+    
+    # Load features
+    feature_dir = f"{GLOBAL_CONFIG['base_dir']}/features"
+    
+    # UniEmbed features for most models
+    X_train = np.load(f"{feature_dir}/X_train_uniembed.npy")
+    X_val = np.load(f"{feature_dir}/X_val_uniembed.npy")
+    
+    # BERT embeddings for BERT-XGBoost
+    X_bert_train = np.load(f"{feature_dir}/X_train_bert.npy")
+    X_bert_val = np.load(f"{feature_dir}/X_val_bert.npy")
+    
+    # Load labels
+    data_dir = f"{GLOBAL_CONFIG['base_dir']}/data"
+    y_train = np.load(f"{data_dir}/y_train.npy")
+    y_val = np.load(f"{data_dir}/y_val.npy")
+    
+    # Train all hybrid models
+    trainer = HybridModelTrainer(GLOBAL_CONFIG)
+    trained_models = trainer.train_all_hybrid_models(
+        X_train, y_train, X_val, y_val,
+        X_bert_train, X_bert_val
+    )
+    
+    print(" Hybrid model training complete!")
+
+
+# ============================================================================
+# FILE: 06_models_transformers.py
+# DESCRIPTION: Transformer models fine-tuning (5 models)
+# ============================================================================
+
+import numpy as np
+import torch
+from torch.utils.data import Dataset, DataLoader
+from torch.optim import AdamW  # Import AdamW from torch
+from transformers import (
+    BertTokenizer, BertForSequenceClassification,
+    DistilBertTokenizer, DistilBertForSequenceClassification,
+    RobertaTokenizer, RobertaForSequenceClassification,
+    ElectraTokenizer, ElectraForSequenceClassification,
+    DebertaTokenizer, DebertaForSequenceClassification,
+    get_linear_schedule_with_warmup
+)
+from tqdm.auto import tqdm
+import time
+import json
+from pathlib import Path
+from config import GLOBAL_CONFIG, set_seed, TRANSFORMER_MODELS
+
+# ============================================================================
+# CUSTOM DATASET
+# ============================================================================
+
+class AttackDetectionDataset(Dataset):
+    """Custom dataset for transformer models"""
+    
+    def __init__(self, texts, labels, tokenizer, max_length=256):
+        self.texts = texts
+        self.labels = labels
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+    
+    def __len__(self):
+        return len(self.texts)
+    
+    def __getitem__(self, idx):
+        text = str(self.texts[idx])
+        label = self.labels[idx]
+        
+        encoding = self.tokenizer(
+            text,
+            add_special_tokens=True,
+            max_length=self.max_length,
+            padding='max_length',
+            truncation=True,
+            return_attention_mask=True,
+            return_tensors='pt'
+        )
+        
+        return {
+            'input_ids': encoding['input_ids'].flatten(),
+            'attention_mask': encoding['attention_mask'].flatten(),
+            'labels': torch.tensor(label, dtype=torch.long)
+        }
+
+# ============================================================================
+# TRANSFORMER MODEL FACTORY
+# ============================================================================
+
+class TransformerModelFactory:
+    """Factory for creating transformer models"""
+    
+    MODEL_CONFIGS = {
+        'BERT': {
+            'model_name': 'bert-base-uncased',
+            'tokenizer_class': BertTokenizer,
+            'model_class': BertForSequenceClassification
+        },
+        'DistilBERT': {
+            'model_name': 'distilbert-base-uncased',
+            'tokenizer_class': DistilBertTokenizer,
+            'model_class': DistilBertForSequenceClassification
+        },
+        'RoBERTa': {
+            'model_name': 'roberta-base',
+            'tokenizer_class': RobertaTokenizer,
+            'model_class': RobertaForSequenceClassification
+        },
+        'ELECTRA': {
+            'model_name': 'google/electra-base-discriminator',
+            'tokenizer_class': ElectraTokenizer,
+            'model_class': ElectraForSequenceClassification
+        },
+        'DeBERTa': {
+            'model_name': 'microsoft/deberta-base',
+            'tokenizer_class': DebertaTokenizer,
+            'model_class': DebertaForSequenceClassification
+        }
+    }
+    
+    def create_model_and_tokenizer(self, model_name):
+        """Create transformer model and tokenizer"""
+        
+        if model_name not in self.MODEL_CONFIGS:
+            raise ValueError(f"Unknown model: {model_name}")
+        
+        config = self.MODEL_CONFIGS[model_name]
+        
+        print(f" Loading {config['model_name']}...")
+        
+        tokenizer = config['tokenizer_class'].from_pretrained(config['model_name'])
+        model = config['model_class'].from_pretrained(
+            config['model_name'],
+            num_labels=2,  # Binary classification
+            problem_type="single_label_classification"
+        )
+        
+        print(f" {model_name} loaded successfully")
+        
+        return model, tokenizer
+
+# ============================================================================
+# TRANSFORMER TRAINER
+# ============================================================================
+
+class TransformerTrainer:
+    """Train and evaluate transformer models"""
+    
+    def __init__(self, config=GLOBAL_CONFIG):
+        self.config = config
+        self.factory = TransformerModelFactory()
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+    def create_data_loaders(self, X_train, y_train, X_val, y_val, tokenizer):
+        """Create PyTorch data loaders"""
+        
+        train_dataset = AttackDetectionDataset(
+            X_train, y_train, tokenizer, self.config['max_seq_length']
+        )
+        val_dataset = AttackDetectionDataset(
+            X_val, y_val, tokenizer, self.config['max_seq_length']
+        )
+        
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=self.config['transformer_batch_size'],
+            shuffle=True,
+            num_workers=0
+        )
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=self.config['transformer_batch_size'],
+            shuffle=False,
+            num_workers=0
+        )
+        
+        return train_loader, val_loader
+    
+    def train_epoch(self, model, train_loader, optimizer, scheduler):
+        """Train for one epoch"""
+        model.train()
+        total_loss = 0
+        correct = 0
+        total = 0
+        
+        progress_bar = tqdm(train_loader, desc="Training")
+        
+        for batch in progress_bar:
+            # Move to device
+            input_ids = batch['input_ids'].to(self.device)
+            attention_mask = batch['attention_mask'].to(self.device)
+            labels = batch['labels'].to(self.device)
+            
+            # Forward pass
+            outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels
+            )
+            
+            loss = outputs.loss
+            logits = outputs.logits
+            
+            # Backward pass
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+            scheduler.step()
+            
+            # Statistics
+            total_loss += loss.item()
+            predictions = torch.argmax(logits, dim=1)
+            correct += (predictions == labels).sum().item()
+            total += labels.size(0)
+            
+            # Update progress bar
+            progress_bar.set_postfix({
+                'loss': f'{loss.item():.4f}',
+                'acc': f'{correct/total:.4f}'
+            })
+        
+        avg_loss = total_loss / len(train_loader)
+        accuracy = correct / total
+        
+        return avg_loss, accuracy
+    
+    def evaluate(self, model, val_loader):
+        """Evaluate model"""
+        model.eval()
+        total_loss = 0
+        correct = 0
+        total = 0
+        
+        with torch.no_grad():
+            for batch in tqdm(val_loader, desc="Evaluating"):
+                input_ids = batch['input_ids'].to(self.device)
+                attention_mask = batch['attention_mask'].to(self.device)
+                labels = batch['labels'].to(self.device)
+                
+                outputs = model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    labels=labels
+                )
+                
+                loss = outputs.loss
+                logits = outputs.logits
+                
+                total_loss += loss.item()
+                predictions = torch.argmax(logits, dim=1)
+                correct += (predictions == labels).sum().item()
+                total += labels.size(0)
+        
+        avg_loss = total_loss / len(val_loader)
+        accuracy = correct / total
+        
+        return avg_loss, accuracy
+    
+    def train_model(self, model_name, X_train, y_train, X_val, y_val):
+        """
+        Fine-tune a transformer model
+        
+        Returns:
+            Fine-tuned model, tokenizer, training info
+        """
+        print(f"\n{'='*70}")
+        print(f"FINE-TUNING: {model_name}")
+        print(f"{'='*70}\n")
+        
+        # Create model and tokenizer
+        model, tokenizer = self.factory.create_model_and_tokenizer(model_name)
+        model.to(self.device)
+        
+        # Create data loaders
+        print(" Creating data loaders...")
+        train_loader, val_loader = self.create_data_loaders(
+            X_train, y_train, X_val, y_val, tokenizer
+        )
+        
+        print(f"   Train batches: {len(train_loader)}")
+        print(f"   Val batches: {len(val_loader)}")
+        
+        # Optimizer and scheduler
+        optimizer = AdamW(
+            model.parameters(),
+            lr=self.config['transformer_lr'],
+            eps=1e-8
+        )
+        
+        total_steps = len(train_loader) * self.config['transformer_epochs']
+        warmup_steps = int(total_steps * self.config['warmup_ratio'])
+        
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=warmup_steps,
+            num_training_steps=total_steps
+        )
+        
+        # Training loop
+        print(f"\n Fine-tuning {model_name} for {self.config['transformer_epochs']} epochs...")
+        
+        history = {
+            'train_loss': [],
+            'train_accuracy': [],
+            'val_loss': [],
+            'val_accuracy': []
+        }
+        
+        best_val_loss = float('inf')
+        start_time = time.time()
+        
+        for epoch in range(self.config['transformer_epochs']):
+            print(f"\n Epoch {epoch + 1}/{self.config['transformer_epochs']}")
+            
+            # Train
+            train_loss, train_acc = self.train_epoch(model, train_loader, optimizer, scheduler)
+            history['train_loss'].append(train_loss)
+            history['train_accuracy'].append(train_acc)
+            
+            # Validate
+            val_loss, val_acc = self.evaluate(model, val_loader)
+            history['val_loss'].append(val_loss)
+            history['val_accuracy'].append(val_acc)
+            
+            print(f"   Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+            print(f"   Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
+            
+            # Save best model
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                print(f"    New best model!")
+        
+        training_time = time.time() - start_time
+        
+        print(f"\n Fine-tuning complete in {training_time:.2f} seconds")
+        
+        # Model info
+        model_info = {
+            'model_name': model_name,
+            'training_time': training_time,
+            'total_parameters': sum(p.numel() for p in model.parameters()),
+            'trainable_parameters': sum(p.numel() for p in model.parameters() if p.requires_grad),
+            'epochs_trained': self.config['transformer_epochs'],
+            'best_val_loss': float(best_val_loss),
+            'best_val_accuracy': float(np.max(history['val_accuracy'])),
+        }
+        
+        return model, tokenizer, history, model_info
+    
+    def save_model(self, model, tokenizer, model_name, model_info, history, save_dir=None):
+        """Save fine-tuned model"""
+        if save_dir is None:
+            save_dir = f"{self.config['models_dir']}/transformers/{model_name}"
+        
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Save model and tokenizer
+        model.save_pretrained(save_dir)
+        tokenizer.save_pretrained(save_dir)
+        print(f" Model and tokenizer saved: {save_dir}")
+        
+        # Save metadata
+        metadata_path = f"{save_dir}/metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(model_info, f, indent=2)
+        print(f" Metadata saved: {metadata_path}")
+        
+        # Save history
+        history_path = f"{save_dir}/history.json"
+        with open(history_path, 'w') as f:
+            json.dump(history, f, indent=2)
+        print(f" History saved: {history_path}")
+    
+    def train_all_transformer_models(self, X_train, y_train, X_val, y_val):
+        """Train all transformer models"""
+        print(f"\n{'='*70}")
+        print(f"FINE-TUNING ALL TRANSFORMER MODELS")
+        print(f"{'='*70}\n")
+        
+        trained_models = {}
+        
+        for model_name in TRANSFORMER_MODELS:
+            try:
+                # Train model
+                model, tokenizer, history, model_info = self.train_model(
+                    model_name, X_train, y_train, X_val, y_val
+                )
+                
+                # Save model
+                self.save_model(model, tokenizer, model_name, model_info, history)
+                
+                # Store
+                trained_models[model_name] = {
+                    'model': model,
+                    'tokenizer': tokenizer,
+                    'history': history,
+                    'info': model_info
+                }
+                
+                print(f" {model_name} complete!\n")
+                
+                # Clear CUDA cache
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                
+            except Exception as e:
+                print(f" Error training {model_name}: {str(e)}\n")
+                continue
+        
+        print(f"\n{'='*70}")
+        print(f" ALL TRANSFORMER MODELS TRAINED: {len(trained_models)}/{len(TRANSFORMER_MODELS)}")
+        print(f"{'='*70}\n")
+        
+        return trained_models
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    
+    
+    set_seed(GLOBAL_CONFIG['random_seed'])
+    
+    # Load raw text data (transformers work with text, not embeddings)
+    data_dir = f"{GLOBAL_CONFIG['base_dir']}/data"
+    X_train = np.load(f"{data_dir}/X_train.npy", allow_pickle=True)
+    X_val = np.load(f"{data_dir}/X_val.npy", allow_pickle=True)
+    X_test = np.load(f"{data_dir}/X_test.npy", allow_pickle=True)
+    
+    y_train = np.load(f"{data_dir}/y_train.npy")
+    y_val = np.load(f"{data_dir}/y_val.npy")
+    y_test = np.load(f"{data_dir}/y_test.npy")
+    
+    # Train all models
+    trainer = TransformerTrainer(GLOBAL_CONFIG)
+    trained_models = trainer.train_all_transformer_models(
+        X_train, y_train, X_val, y_val
+    )
+    
+    print(" Transformer fine-tuning complete!")
+
+
+# ============================================================================
+# FILE: 10_visualization.py
+# DESCRIPTION: Generate all publication-ready visualizations
+# ============================================================================
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import confusion_matrix, roc_curve, precision_recall_curve, auc
+import json
+from pathlib import Path
+from matplotlib.patches import Patch
+from config import GLOBAL_CONFIG
+import warnings
+warnings.filterwarnings('ignore')
+
+# Set style for publication-quality figures
+plt.style.use('seaborn-v0_8-darkgrid')
+sns.set_palette("husl")
+plt.rcParams['figure.dpi'] = 300
+plt.rcParams['savefig.dpi'] = 300
+plt.rcParams['font.size'] = 10
+plt.rcParams['axes.labelsize'] = 12
+plt.rcParams['axes.titlesize'] = 14
+plt.rcParams['xtick.labelsize'] = 10
+plt.rcParams['ytick.labelsize'] = 10
+plt.rcParams['legend.fontsize'] = 10
+
+# ============================================================================
+# VISUALIZATION GENERATOR
+# ============================================================================
+
+class VisualizationGenerator:
+    """Generate all publication-ready visualizations"""
+    
+    def __init__(self, config=GLOBAL_CONFIG):
+        self.config = config
+        self.viz_dir = config['viz_dir']
+        
+    def plot_training_curves(self, model_name, history, model_type='deep_learning'):
+        """Plot training and validation loss/accuracy curves"""
+        
+        save_dir = f"{self.viz_dir}/individual_models/{model_name}"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        if isinstance(history, dict):
+            history_dict = history
+        else:
+            history_dict = history.history
+        
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+        
+        # Loss curve
+        epochs = range(1, len(history_dict['loss']) + 1)
+        ax1.plot(epochs, history_dict['loss'], 'b-', label='Training Loss', linewidth=2)
+        if 'val_loss' in history_dict:
+            ax1.plot(epochs, history_dict['val_loss'], 'r-', label='Validation Loss', linewidth=2)
+        ax1.set_xlabel('Epoch')
+        ax1.set_ylabel('Loss')
+        ax1.set_title(f'{model_name} - Loss Curve')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # Accuracy curve
+        if 'accuracy' in history_dict:
+            acc_key = 'accuracy'
+        elif 'train_accuracy' in history_dict:
+            acc_key = 'train_accuracy'
+        else:
+            acc_key = None
+        
+        if acc_key:
+            ax2.plot(epochs, history_dict[acc_key], 'b-', label='Training Accuracy', linewidth=2)
+            if 'val_accuracy' in history_dict:
+                ax2.plot(epochs, history_dict['val_accuracy'], 'r-', label='Validation Accuracy', linewidth=2)
+            ax2.set_xlabel('Epoch')
+            ax2.set_ylabel('Accuracy')
+            ax2.set_title(f'{model_name} - Accuracy Curve')
+            ax2.legend()
+            ax2.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        save_path = f"{save_dir}/training_curves.png"
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Saved training curves: {save_path}")
+    
+    def plot_confusion_matrix(self, model_name, y_true, y_pred):
+        """Plot confusion matrix heatmap"""
+        
+        save_dir = f"{self.viz_dir}/individual_models/{model_name}"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        cm = confusion_matrix(y_true, y_pred)
+        
+        fig, ax = plt.subplots(figsize=(8, 6))
+        
+        # Calculate percentages
+        cm_percent = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis] * 100
+        
+        # Create annotations
+        annotations = np.empty_like(cm).astype(str)
+        for i in range(cm.shape[0]):
+            for j in range(cm.shape[1]):
+                annotations[i, j] = f'{cm[i, j]}\n({cm_percent[i, j]:.1f}%)'
+        
+        sns.heatmap(cm, annot=annotations, fmt='', cmap='Blues', 
+                   xticklabels=['Benign', 'Attack'],
+                   yticklabels=['Benign', 'Attack'],
+                   cbar_kws={'label': 'Count'},
+                   ax=ax)
+        
+        ax.set_xlabel('Predicted Label')
+        ax.set_ylabel('True Label')
+        ax.set_title(f'{model_name} - Confusion Matrix')
+        
+        plt.tight_layout()
+        save_path = f"{save_dir}/confusion_matrix.png"
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Saved confusion matrix: {save_path}")
+    
+    def plot_roc_curve(self, model_name, y_true, y_pred_proba):
+        """Plot ROC curve"""
+        
+        save_dir = f"{self.viz_dir}/individual_models/{model_name}"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Handle probability format
+        if len(y_pred_proba.shape) > 1 and y_pred_proba.shape[1] == 2:
+            y_scores = y_pred_proba[:, 1]
+        else:
+            y_scores = y_pred_proba.flatten()
+        
+        fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+        roc_auc = auc(fpr, tpr)
+        
+        fig, ax = plt.subplots(figsize=(8, 6))
+        
+        ax.plot(fpr, tpr, color='darkorange', lw=2, 
+               label=f'ROC curve (AUC = {roc_auc:.4f})')
+        ax.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--', 
+               label='Random Classifier')
+        
+        ax.set_xlim([0.0, 1.0])
+        ax.set_ylim([0.0, 1.05])
+        ax.set_xlabel('False Positive Rate')
+        ax.set_ylabel('True Positive Rate')
+        ax.set_title(f'{model_name} - ROC Curve')
+        ax.legend(loc="lower right")
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        save_path = f"{save_dir}/roc_curve.png"
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Saved ROC curve: {save_path}")
+    
+    def plot_precision_recall_curve(self, model_name, y_true, y_pred_proba):
+        """Plot Precision-Recall curve"""
+        
+        save_dir = f"{self.viz_dir}/individual_models/{model_name}"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Handle probability format
+        if len(y_pred_proba.shape) > 1 and y_pred_proba.shape[1] == 2:
+            y_scores = y_pred_proba[:, 1]
+        else:
+            y_scores = y_pred_proba.flatten()
+        
+        precision, recall, thresholds = precision_recall_curve(y_true, y_scores)
+        pr_auc = auc(recall, precision)
+        
+        fig, ax = plt.subplots(figsize=(8, 6))
+        
+        ax.plot(recall, precision, color='blue', lw=2, 
+               label=f'PR curve (AUC = {pr_auc:.4f})')
+        
+        ax.set_xlim([0.0, 1.0])
+        ax.set_ylim([0.0, 1.05])
+        ax.set_xlabel('Recall')
+        ax.set_ylabel('Precision')
+        ax.set_title(f'{model_name} - Precision-Recall Curve')
+        ax.legend(loc="lower left")
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        save_path = f"{save_dir}/pr_curve.png"
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Saved PR curve: {save_path}")
+    
+    def plot_feature_importance(self, model_name, model, feature_names=None, top_k=20):
+        """Plot feature importance for tree-based models"""
+        
+        if not hasattr(model, 'feature_importances_'):
+            return
+        
+        save_dir = f"{self.viz_dir}/individual_models/{model_name}"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        importances = model.feature_importances_
+        
+        if feature_names is None:
+            feature_names = [f'Feature_{i}' for i in range(len(importances))]
+        
+        # Get top k features
+        indices = np.argsort(importances)[-top_k:]
+        
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        ax.barh(range(top_k), importances[indices])
+        ax.set_yticks(range(top_k))
+        ax.set_yticklabels([feature_names[i] for i in indices])
+        ax.set_xlabel('Importance')
+        ax.set_title(f'{model_name} - Top {top_k} Feature Importance')
+        ax.grid(True, alpha=0.3, axis='x')
+        
+        plt.tight_layout()
+        save_path = f"{save_dir}/feature_importance.png"
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Saved feature importance: {save_path}")
+    
+    def plot_prediction_distribution(self, model_name, y_pred_proba, y_true):
+        """Plot distribution of prediction probabilities"""
+        
+        save_dir = f"{self.viz_dir}/individual_models/{model_name}"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Handle probability format
+        if len(y_pred_proba.shape) > 1 and y_pred_proba.shape[1] == 2:
+            y_scores = y_pred_proba[:, 1]
+        else:
+            y_scores = y_pred_proba.flatten()
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Separate by true class
+        benign_scores = y_scores[y_true == 0]
+        attack_scores = y_scores[y_true == 1]
+        
+        ax.hist(benign_scores, bins=50, alpha=0.6, label='Benign (True)', color='blue')
+        ax.hist(attack_scores, bins=50, alpha=0.6, label='Attack (True)', color='red')
+        
+        ax.set_xlabel('Prediction Probability (Attack Class)')
+        ax.set_ylabel('Frequency')
+        ax.set_title(f'{model_name} - Prediction Distribution')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        save_path = f"{save_dir}/prediction_distribution.png"
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Saved prediction distribution: {save_path}")
+    
+    def plot_comparative_accuracy(self, results_df):
+        """Plot accuracy comparison across all models"""
+        
+        save_dir = f"{self.viz_dir}/comparative"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        fig, ax = plt.subplots(figsize=(16, 10))
+        
+        # Sort by accuracy
+        results_sorted = results_df.sort_values('accuracy', ascending=True)
+        
+        # Color by model type
+        colors = []
+        for model_type in results_sorted['model_type']:
+            if model_type == 'Classical ML':
+                colors.append('skyblue')
+            elif model_type == 'Deep Learning':
+                colors.append('lightcoral')
+            elif model_type == 'Transformer':
+                colors.append('lightgreen')
+            elif model_type == 'Hybrid':
+                colors.append('plum')
+            else:
+                colors.append('gray')
+        
+        bars = ax.barh(range(len(results_sorted)), results_sorted['accuracy'], color=colors)
+        ax.set_yticks(range(len(results_sorted)))
+        ax.set_yticklabels(results_sorted['model_name'])
+        ax.set_xlabel('Accuracy')
+        ax.set_title('Model Accuracy Comparison')
+        ax.set_xlim([0, 1.0])
+        ax.grid(True, alpha=0.3, axis='x')
+        
+        # Add value labels
+        for i, (idx, row) in enumerate(results_sorted.iterrows()):
+            ax.text(row['accuracy'] + 0.005, i, f"{row['accuracy']:.4f}", 
+                   va='center', fontsize=8)
+        
+        # Legend
+        from matplotlib.patches import Patch
+        
+        legend_elements = [
+            Patch(facecolor='skyblue', label='Classical ML'),
+            Patch(facecolor='lightcoral', label='Deep Learning'),
+            Patch(facecolor='lightgreen', label='Transformer'),
+            Patch(facecolor='plum', label='Hybrid')
+        ]
+        ax.legend(handles=legend_elements, loc='lower right')
+        
+        plt.tight_layout()
+        save_path = f"{save_dir}/accuracy_comparison.png"
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Saved accuracy comparison: {save_path}")
+    
+    def plot_comparative_f1_score(self, results_df):
+        """Plot F1-score comparison across all models"""
+        
+        save_dir = f"{self.viz_dir}/comparative"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        fig, ax = plt.subplots(figsize=(16, 10))
+        
+        # Sort by F1-score
+        results_sorted = results_df.sort_values('f1_score', ascending=True)
+        
+        # Color by model type
+        colors = []
+        for model_type in results_sorted['model_type']:
+            if model_type == 'Classical ML':
+                colors.append('skyblue')
+            elif model_type == 'Deep Learning':
+                colors.append('lightcoral')
+            elif model_type == 'Transformer':
+                colors.append('lightgreen')
+            elif model_type == 'Hybrid':
+                colors.append('plum')
+            else:
+                colors.append('gray')
+        
+        bars = ax.barh(range(len(results_sorted)), results_sorted['f1_score'], color=colors)
+        ax.set_yticks(range(len(results_sorted)))
+        ax.set_yticklabels(results_sorted['model_name'])
+        ax.set_xlabel('F1-Score')
+        ax.set_title('Model F1-Score Comparison')
+        ax.set_xlim([0, 1.0])
+        ax.grid(True, alpha=0.3, axis='x')
+        
+        # Add value labels
+        for i, (idx, row) in enumerate(results_sorted.iterrows()):
+            ax.text(row['f1_score'] + 0.005, i, f"{row['f1_score']:.4f}", 
+                   va='center', fontsize=8)
+        
+        # Legend
+        
+        legend_elements = [
+            Patch(facecolor='skyblue', label='Classical ML'),
+            Patch(facecolor='lightcoral', label='Deep Learning'),
+            Patch(facecolor='lightgreen', label='Transformer'),
+            Patch(facecolor='plum', label='Hybrid')
+        ]
+        ax.legend(handles=legend_elements, loc='lower right')
+        
+        plt.tight_layout()
+        save_path = f"{save_dir}/f1_score_comparison.png"
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Saved F1-score comparison: {save_path}")
+    
+    def plot_training_time_comparison(self, results_df):
+        """Plot training time comparison (log scale)"""
+        
+        save_dir = f"{self.viz_dir}/comparative"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Load training times from metadata
+        training_times = []
+        model_names = []
+        
+        for idx, row in results_df.iterrows():
+            model_name = row['model_name']
+            model_type = row['model_type']
+            
+            try:
+                if model_type == 'Classical ML':
+                    metadata_path = f"{self.config['models_dir']}/classical_ml/{model_name}_metadata.json"
+                elif model_type == 'Deep Learning':
+                    metadata_path = f"{self.config['models_dir']}/deep_learning/{model_name}_metadata.json"
+                elif model_type == 'Transformer':
+                    metadata_path = f"{self.config['models_dir']}/transformers/{model_name}/metadata.json"
+                elif model_type == 'Hybrid':
+                    metadata_path = f"{self.config['models_dir']}/hybrid/{model_name}_metadata.json"
+                else:
+                    continue
+                
+                with open(metadata_path, 'r') as f:
+                    metadata = json.load(f)
+                    training_times.append(metadata['training_time'])
+                    model_names.append(model_name)
+            except:
+                continue
+        
+        if not training_times:
+            print("No training time data available")
+            return
+        
+        fig, ax = plt.subplots(figsize=(16, 10))
+        
+        # Sort by training time
+        sorted_indices = np.argsort(training_times)
+        sorted_times = [training_times[i] for i in sorted_indices]
+        sorted_names = [model_names[i] for i in sorted_indices]
+        
+        bars = ax.barh(range(len(sorted_times)), sorted_times)
+        ax.set_yticks(range(len(sorted_times)))
+        ax.set_yticklabels(sorted_names)
+        ax.set_xlabel('Training Time (seconds, log scale)')
+        ax.set_xscale('log')
+        ax.set_title('Model Training Time Comparison')
+        ax.grid(True, alpha=0.3, axis='x')
+        
+        # Add value labels
+        for i, time in enumerate(sorted_times):
+            ax.text(time * 1.1, i, f"{time:.1f}s", va='center', fontsize=8)
+        
+        plt.tight_layout()
+        save_path = f"{save_dir}/training_time_comparison.png"
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Saved training time comparison: {save_path}")
+    
+    def plot_precision_recall_scatter(self, results_df):
+        """Plot precision vs recall scatter plot"""
+        
+        save_dir = f"{self.viz_dir}/comparative"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        fig, ax = plt.subplots(figsize=(12, 10))
+        
+        # Color map for model types
+        color_map = {
+            'Classical ML': 'blue',
+            'Deep Learning': 'red',
+            'Transformer': 'green',
+            'Hybrid': 'purple'
+        }
+        
+        for model_type in results_df['model_type'].unique():
+            subset = results_df[results_df['model_type'] == model_type]
+            ax.scatter(subset['recall'], subset['precision'], 
+                      c=color_map.get(model_type, 'gray'),
+                      label=model_type, s=100, alpha=0.6, edgecolors='black')
+        
+        # Annotate top models
+        top_models = results_df.nlargest(5, 'f1_score')
+        for idx, row in top_models.iterrows():
+            ax.annotate(row['model_name'], 
+                       (row['recall'], row['precision']),
+                       xytext=(5, 5), textcoords='offset points',
+                       fontsize=8, alpha=0.7)
+        
+        ax.set_xlabel('Recall')
+        ax.set_ylabel('Precision')
+        ax.set_title('Precision vs Recall - All Models')
+        ax.set_xlim([0, 1.05])
+        ax.set_ylim([0, 1.05])
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        save_path = f"{save_dir}/precision_recall_scatter.png"
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Saved precision-recall scatter: {save_path}")
+    
+    def plot_radar_chart_top_models(self, results_df, top_n=10):
+        """Plot radar chart comparing top models across multiple metrics"""
+        
+        save_dir = f"{self.viz_dir}/comparative"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Select top N models by F1-score
+        top_models = results_df.nlargest(top_n, 'f1_score')
+        
+        # Metrics to compare
+        metrics = ['accuracy', 'precision', 'recall', 'f1_score', 'roc_auc']
+        
+        # Number of variables
+        num_vars = len(metrics)
+        angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
+        angles += angles[:1]
+        
+        fig, ax = plt.subplots(figsize=(12, 12), subplot_kw=dict(projection='polar'))
+        
+        # Plot each model
+        for idx, row in top_models.iterrows():
+            values = [row[metric] if row[metric] is not None else 0 for metric in metrics]
+            values += values[:1]
+            
+            ax.plot(angles, values, 'o-', linewidth=2, label=row['model_name'])
+            ax.fill(angles, values, alpha=0.15)
+        
+        # Fix axis
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels([m.replace('_', ' ').title() for m in metrics])
+        ax.set_ylim(0, 1)
+        ax.set_title(f'Top {top_n} Models - Multi-Metric Comparison', pad=20)
+        ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
+        ax.grid(True)
+        
+        plt.tight_layout()
+        save_path = f"{save_dir}/radar_chart_top_models.png"
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Saved radar chart: {save_path}")
+    
+    def plot_error_analysis_heatmap(self, results_df):
+        """Plot heatmap of FP and FN counts"""
+        
+        save_dir = f"{self.viz_dir}/comparative"
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 10))
+        
+        # Sort by F1-score
+        results_sorted = results_df.sort_values('f1_score', ascending=False)
+        
+        # False Positives
+        fp_data = results_sorted[['model_name', 'fp']].set_index('model_name')
+        sns.heatmap(fp_data, annot=True, fmt='d', cmap='Reds', 
+                   cbar_kws={'label': 'Count'}, ax=ax1)
+        ax1.set_title('False Positives by Model')
+        ax1.set_xlabel('')
+        ax1.set_ylabel('')
+        
+        # False Negatives
+        fn_data = results_sorted[['model_name', 'fn']].set_index('model_name')
+        sns.heatmap(fn_data, annot=True, fmt='d', cmap='Oranges', 
+                   cbar_kws={'label': 'Count'}, ax=ax2)
+        ax2.set_title('False Negatives by Model')
+        ax2.set_xlabel('')
+        ax2.set_ylabel('')
+        
+        plt.tight_layout()
+        save_path = f"{save_dir}/error_analysis_heatmap.png"
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Saved error analysis heatmap: {save_path}")
+    
+    def generate_all_visualizations(self, results_df):
+        """Generate all comparative visualizations"""
+        
+        print("\n" + "="*70)
+        print("GENERATING COMPARATIVE VISUALIZATIONS")
+        print("="*70 + "\n")
+        
+        self.plot_comparative_accuracy(results_df)
+        self.plot_comparative_f1_score(results_df)
+        self.plot_training_time_comparison(results_df)
+        self.plot_precision_recall_scatter(results_df)
+        self.plot_radar_chart_top_models(results_df, top_n=10)
+        self.plot_error_analysis_heatmap(results_df)
+        
+        print("\nAll comparative visualizations generated!")
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    
+    
+    # Load results
+    results_path = f"{GLOBAL_CONFIG['results_dir']}/metrics/all_models_metrics.csv"
+    results_df = pd.read_csv(results_path)
+    
+    # Generate visualizations
+    viz_gen = VisualizationGenerator(GLOBAL_CONFIG)
+    viz_gen.generate_all_visualizations(results_df)
+    
+    print("\nVisualization generation complete!")
+

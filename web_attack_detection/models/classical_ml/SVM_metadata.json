@@ -1,0 +1,8 @@
+{
+  "model_name": "SVM",
+  "training_time": 595.2720069885254,
+  "training_samples": 122047,
+  "n_features": 1000,
+  "n_features_in": 1000,
+  "feature_type": "tfidf"
+}

@@ -1,0 +1,10 @@
+{
+  "model_name": "DistilBERT",
+  "training_time": 4261.953895807266,
+  "total_parameters": 66955010,
+  "trainable_parameters": 66955010,
+  "epochs_trained": 1,
+  "best_val_loss": 0.09846501328080147,
+  "best_val_accuracy": 0.9735785569533132,
+  "samples_used": 12204
+}
