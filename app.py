@@ -8,9 +8,10 @@ from tensorflow import keras
 import torch
 from pathlib import Path
 import re
+import os
 from gensim.models import Word2Vec, FastText
 from sklearn.feature_extraction.text import TfidfVectorizer
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, snapshot_download
 from transformers import BertTokenizer, BertForSequenceClassification, DistilBertTokenizer, DistilBertForSequenceClassification
 import warnings
 warnings.filterwarnings('ignore')
@@ -128,23 +129,43 @@ def load_single_model(model_name, model_type):
         return None
 
 @st.cache_resource
-def load_feature_extractors_lazy():
-    """Load TF-IDF vectorizer ONLY (no Word2Vec/FastText - they break on HF)"""
+def load_feature_extractors_full():
+    """Load ALL feature extractors including Word2Vec and FastText"""
     repo_id = "Dr-KeK/sqli-xss-models"
     extractors = {}
     
     try:
-        # Load TF-IDF vectorizer
-        tfidf_path = hf_hub_download(
-            repo_id=repo_id, 
-            filename="features/tfidf_vectorizer.pkl", 
-            repo_type="model"
-        )
-        with open(tfidf_path, 'rb') as f:
-            extractors['tfidf'] = pickle.load(f)
-        st.success("✅ Loaded TF-IDF vectorizer")
+        # Download entire features folder to get all Gensim files
+        with st.spinner("📥 Downloading feature models from HuggingFace..."):
+            cache_dir = snapshot_download(
+                repo_id=repo_id,
+                allow_patterns="features/*",
+                repo_type="model"
+            )
+        
+        features_dir = os.path.join(cache_dir, "features")
+        
+        # Load Word2Vec
+        w2v_path = os.path.join(features_dir, "word2vec.model")
+        if os.path.exists(w2v_path):
+            extractors['word2vec'] = Word2Vec.load(w2v_path)
+            st.success("✅ Word2Vec loaded")
+        
+        # Load FastText
+        ft_path = os.path.join(features_dir, "fasttext.model")
+        if os.path.exists(ft_path):
+            extractors['fasttext'] = FastText.load(ft_path)
+            st.success("✅ FastText loaded")
+        
+        # Load TF-IDF
+        tfidf_path = os.path.join(features_dir, "tfidf_vectorizer.pkl")
+        if os.path.exists(tfidf_path):
+            with open(tfidf_path, 'rb') as f:
+                extractors['tfidf'] = pickle.load(f)
+            st.success("✅ TF-IDF loaded")
+            
     except Exception as e:
-        st.error(f"❌ Failed to load TF-IDF: {str(e)}")
+        st.error(f"❌ Error loading feature extractors: {str(e)}")
     
     return extractors
 
@@ -155,7 +176,34 @@ def extract_tfidf_features(text, extractors):
         return features
     else:
         st.error("❌ TF-IDF vectorizer not available!")
-        return np.zeros(1000)
+        return None
+
+def extract_uniembed_features(text, extractors, w2v_dim=50, ft_dim=50):
+    """Extract UniEmbed features (Word2Vec + FastText) for deep learning models"""
+    tokens = text.split()
+    
+    # Word2Vec embeddings
+    w2v_vectors = []
+    if 'word2vec' in extractors:
+        for token in tokens:
+            if token in extractors['word2vec'].wv:
+                w2v_vectors.append(extractors['word2vec'].wv[token])
+    w2v_emb = np.mean(w2v_vectors, axis=0) if w2v_vectors else np.zeros(w2v_dim)
+    
+    # FastText embeddings
+    ft_vectors = []
+    if 'fasttext' in extractors:
+        for token in tokens:
+            if token in extractors['fasttext'].wv:
+                ft_vectors.append(extractors['fasttext'].wv[token])
+    ft_emb = np.mean(ft_vectors, axis=0) if ft_vectors else np.zeros(ft_dim)
+    
+    # Concatenate: Word2Vec (50) + FastText (50) = 100D
+    # NOTE: Your training used Word2Vec(50) + FastText(50) + USE(512) = 612D
+    # If USE was used, we need to add it here too
+    uniembed = np.concatenate([w2v_emb, ft_emb])
+    
+    return uniembed
 
 def prepare_deep_learning_input(features, model_name):
     """Reshape features for deep learning models"""
@@ -216,8 +264,8 @@ with st.sidebar:
         'Gaussian_Naive_Bayes': st.checkbox("Naive Bayes"),
     }
     
-    st.markdown("#### Deep Learning (Large, TF-IDF)")
-    st.caption("⚠️ These also use TF-IDF features")
+    st.markdown("#### Deep Learning (Large, UniEmbed)")
+    st.caption("⚠️ These use Word2Vec + FastText features")
     dl_models = {
         'MLP': st.checkbox("MLP", value=False),
         'CNN': st.checkbox("CNN", value=False),
@@ -233,7 +281,7 @@ with st.sidebar:
         'BERT': st.checkbox("BERT", value=False),
     }
     
-    st.markdown("#### Hybrid (Medium, TF-IDF)")
+    st.markdown("#### Hybrid (Medium, UniEmbed)")
     hybrid_models = {
         'StackingEnsemble': st.checkbox("Stacking Ensemble", value=False),
         'SoftVoting': st.checkbox("Soft Voting", value=False),
@@ -280,10 +328,9 @@ if analyze_button and user_input:
         processed_text = preprocessor.preprocess(user_input)
 
         try:
-            # Load TF-IDF vectorizer (cached)
+            # Load feature extractors (cached)
             if not st.session_state.feature_extractors:
-                with st.spinner("📥 Loading TF-IDF vectorizer from HuggingFace..."):
-                    st.session_state.feature_extractors = load_feature_extractors_lazy()
+                st.session_state.feature_extractors = load_feature_extractors_full()
             
             extractors = st.session_state.feature_extractors
             
@@ -291,9 +338,21 @@ if analyze_button and user_input:
                 st.error("❌ Failed to load feature extractors!")
                 st.stop()
             
-            # Extract TF-IDF features (for Classical ML, DL, Hybrid)
-            tfidf_features = extract_tfidf_features(processed_text, extractors)
-            st.info(f"📊 TF-IDF feature vector: {tfidf_features.shape[0]} dimensions")
+            # Extract features based on what's needed
+            tfidf_features = None
+            uniembed_features = None
+            
+            # Check if we need TF-IDF (for classical ML)
+            if any(classical_models.values()):
+                tfidf_features = extract_tfidf_features(processed_text, extractors)
+                if tfidf_features is not None:
+                    st.info(f"📊 TF-IDF features: {tfidf_features.shape[0]} dimensions")
+            
+            # Check if we need UniEmbed (for deep learning & hybrid)
+            if any(dl_models.values()) or any(hybrid_models.values()):
+                uniembed_features = extract_uniembed_features(processed_text, extractors)
+                if uniembed_features is not None:
+                    st.info(f"📊 UniEmbed features: {uniembed_features.shape[0]} dimensions (Word2Vec + FastText)")
 
             with st.expander("🔍 Preprocessed Text"):
                 col_a, col_b = st.columns(2)
@@ -311,7 +370,7 @@ if analyze_button and user_input:
 
             # Classical ML Models - USE TF-IDF
             selected_classical = [k for k, v in classical_models.items() if v]
-            if selected_classical:
+            if selected_classical and tfidf_features is not None:
                 st.subheader("🔹 Classical Machine Learning Models")
                 classical_cols = st.columns(min(3, len(selected_classical)))
                 
@@ -325,7 +384,6 @@ if analyze_button and user_input:
                         if model_name in st.session_state.loaded_models:
                             try:
                                 model = st.session_state.loaded_models[model_name]
-                                # USE TF-IDF FEATURES
                                 pred = model.predict(tfidf_features.reshape(1, -1))[0]
                                 if hasattr(model, 'predict_proba'):
                                     proba = model.predict_proba(tfidf_features.reshape(1, -1))[0]
@@ -348,9 +406,9 @@ if analyze_button and user_input:
                             except Exception as e:
                                 st.warning(f"⚠️ {model_name}: {str(e)}")
 
-            # Deep Learning Models - ALSO USE TF-IDF
+            # Deep Learning Models - USE UNIEMBED
             selected_dl = [k for k, v in dl_models.items() if v]
-            if selected_dl:
+            if selected_dl and uniembed_features is not None:
                 st.subheader("🔹 Deep Learning Models")
                 dl_cols = st.columns(min(3, len(selected_dl)))
                 
@@ -364,8 +422,8 @@ if analyze_button and user_input:
                         if model_name in st.session_state.loaded_models:
                             try:
                                 model = st.session_state.loaded_models[model_name]
-                                # USE TF-IDF FEATURES (reshaped for DL architecture)
-                                input_data = prepare_deep_learning_input(tfidf_features, model_name)
+                                # USE UNIEMBED FEATURES
+                                input_data = prepare_deep_learning_input(uniembed_features, model_name)
                                 proba = model.predict(input_data, verbose=0)[0][0]
                                 pred = 1 if proba > 0.5 else 0
                                 confidence = proba * 100 if pred == 1 else (1 - proba) * 100
@@ -400,7 +458,7 @@ if analyze_button and user_input:
                         
                         if model_name in st.session_state.loaded_models:
                             try:
-                                # USE RAW TEXT (not processed!)
+                                # USE RAW TEXT
                                 pred, conf = predict_with_transformer(user_input, st.session_state.loaded_models[model_name])
                                 confidence = conf * 100
 
@@ -419,9 +477,9 @@ if analyze_button and user_input:
                             except Exception as e:
                                 st.warning(f"⚠️ {model_name}: {str(e)}")
 
-            # Hybrid Models - USE TF-IDF
+            # Hybrid Models - USE UNIEMBED
             selected_hybrid = [k for k, v in hybrid_models.items() if v]
-            if selected_hybrid:
+            if selected_hybrid and uniembed_features is not None:
                 st.subheader("🔹 Hybrid Ensemble Models")
                 hybrid_cols = st.columns(min(3, len(selected_hybrid)))
                 
@@ -435,10 +493,10 @@ if analyze_button and user_input:
                         if model_name in st.session_state.loaded_models:
                             try:
                                 model = st.session_state.loaded_models[model_name]
-                                # USE TF-IDF FEATURES
-                                pred = model.predict(tfidf_features.reshape(1, -1))[0]
+                                # USE UNIEMBED FEATURES
+                                pred = model.predict(uniembed_features.reshape(1, -1))[0]
                                 if hasattr(model, 'predict_proba'):
-                                    proba = model.predict_proba(tfidf_features.reshape(1, -1))[0]
+                                    proba = model.predict_proba(uniembed_features.reshape(1, -1))[0]
                                     confidence = proba[pred] * 100
                                 else:
                                     confidence = 100 if pred == 1 else 0
@@ -499,6 +557,6 @@ st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666;'>
     <p>🔬 Advanced Web Attack Detection System | Memory-Optimized Version</p>
-    <p>Models load on-demand from HuggingFace • TF-IDF Feature Extraction</p>
+    <p>Models load on-demand from HuggingFace • Full Feature Extraction</p>
 </div>
 """, unsafe_allow_html=True)
