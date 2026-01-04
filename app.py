@@ -78,7 +78,7 @@ class ContentMatchingPreprocessor:
         return text
 
 @st.cache_resource
-def load_models(models_dir='models'):
+def load_models(models_dir='web_attack_detection/models'):
     """Load all trained models from repository"""
     models = {}
     loaded_count = 0
@@ -133,7 +133,7 @@ def load_models(models_dir='models'):
     return models, loaded_count
 
 @st.cache_resource
-def load_feature_extractors(features_dir='features'):
+def load_feature_extractors(features_dir='web_attack_detection/features'):
     """Load feature extraction models"""
     extractors = {}
 
@@ -216,8 +216,8 @@ st.markdown("---")
 # Sidebar
 with st.sidebar:
     st.header("⚙️ Configuration")
-    models_dir = st.text_input("Models Directory", value="models")
-    features_dir = st.text_input("Features Directory", value="features")
+    models_dir = st.text_input("Models Directory", value="web_attack_detection/models")
+    features_dir = st.text_input("Features Directory", value="web_attack_detection/features")
 
     st.markdown("---")
     st.header("📊 Model Categories")
@@ -285,9 +285,9 @@ if analyze_button and user_input:
                 classical_cols = st.columns(3)
                 col_idx = 0
 
-                classical_models = ['LogisticRegression', 'SVM', 'GaussianNaiveBayes', 
-                                   'DecisionTree', 'KNN', 'RandomForest', 'XGBoost', 
-                                   'GradientBoosting', 'ExtraTrees']
+                classical_models = ['Logistic_Regression', 'SVM', 'Gaussian_Naive_Bayes', 
+                                   'Decision_Tree', 'KNN', 'Random_Forest', 'XGBoost', 
+                                   'Gradient_Boosting', 'Extra_Trees']
 
                 for model_name in classical_models:
                     if model_name in models:
@@ -303,11 +303,11 @@ if analyze_button and user_input:
                             label = "🚨 ATTACK" if pred == 1 else "✅ SAFE"
 
                             with classical_cols[col_idx % 3]:
-                                st.metric(label=model_name, value=label,
+                                st.metric(label=model_name.replace('_', ' '), value=label,
                                         delta=f"{confidence:.1f}% confidence")
 
                             results.append({
-                                'Model': model_name,
+                                'Model': model_name.replace('_', ' '),
                                 'Category': 'Classical ML',
                                 'Prediction': label,
                                 'Confidence': f'{confidence:.1f}%'
