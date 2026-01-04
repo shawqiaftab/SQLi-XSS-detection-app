@@ -8,9 +8,11 @@ from tensorflow import keras
 import torch
 from pathlib import Path
 import re
+import os
 from gensim.models import Word2Vec, FastText
 from sklearn.feature_extraction.text import TfidfVectorizer
 from transformers import BertTokenizer, BertForSequenceClassification, DistilBertTokenizer, DistilBertForSequenceClassification
+from huggingface_hub import snapshot_download
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -78,13 +80,38 @@ class ContentMatchingPreprocessor:
         return text
 
 @st.cache_resource
-def load_models(models_dir='web_attack_detection/models'):
-    """Load all trained models from repository"""
+def download_models_from_hf():
+    """Download models from Hugging Face"""
+    hf_repo = "Dr-KeK/sqli-xss-models"
+    local_dir = "hf_models"
+    
+    if not os.path.exists(local_dir):
+        with st.spinner("📥 Downloading models from Hugging Face (first time only, ~5-10 min)..."):
+            try:
+                snapshot_download(
+                    repo_id=hf_repo,
+                    local_dir=local_dir,
+                    repo_type="model"
+                )
+                st.success("✅ Models downloaded successfully!")
+            except Exception as e:
+                st.error(f"Failed to download models: {str(e)}")
+                return None
+    
+    return local_dir
+
+@st.cache_resource
+def load_models():
+    """Load all trained models"""
+    base_dir = download_models_from_hf()
+    if not base_dir:
+        return {}, 0
+    
     models = {}
     loaded_count = 0
 
     # Classical ML models
-    classical_path = Path(models_dir) / 'classical_ml'
+    classical_path = Path(base_dir) / 'models' / 'classical_ml'
     if classical_path.exists():
         for model_file in classical_path.glob('*.pkl'):
             try:
@@ -94,7 +121,7 @@ def load_models(models_dir='web_attack_detection/models'):
                 st.warning(f"Could not load {model_file.stem}: {str(e)}")
 
     # Deep Learning models
-    dl_path = Path(models_dir) / 'deep_learning'
+    dl_path = Path(base_dir) / 'models' / 'deep_learning'
     if dl_path.exists():
         for model_file in dl_path.glob('*.h5'):
             try:
@@ -106,7 +133,7 @@ def load_models(models_dir='web_attack_detection/models'):
     # Transformer models
     transformer_models = ['DistilBERT', 'BERT']
     for model_name in transformer_models:
-        model_dir = Path(models_dir) / 'transformers' / model_name
+        model_dir = Path(base_dir) / 'models' / 'transformers' / model_name
         if model_dir.exists():
             try:
                 if model_name == 'DistilBERT':
@@ -121,7 +148,7 @@ def load_models(models_dir='web_attack_detection/models'):
                 st.warning(f"Could not load {model_name}: {str(e)}")
 
     # Hybrid models
-    hybrid_path = Path(models_dir) / 'hybrid'
+    hybrid_path = Path(base_dir) / 'models' / 'hybrid'
     if hybrid_path.exists():
         for model_file in hybrid_path.glob('*.pkl'):
             try:
@@ -133,19 +160,23 @@ def load_models(models_dir='web_attack_detection/models'):
     return models, loaded_count
 
 @st.cache_resource
-def load_feature_extractors(features_dir='web_attack_detection/features'):
+def load_feature_extractors():
     """Load feature extraction models"""
+    base_dir = download_models_from_hf()
+    if not base_dir:
+        return {}
+    
     extractors = {}
 
-    w2v_path = Path(features_dir) / 'word2vec.model'
+    w2v_path = Path(base_dir) / 'features' / 'word2vec.model'
     if w2v_path.exists():
         extractors['word2vec'] = Word2Vec.load(str(w2v_path))
 
-    ft_path = Path(features_dir) / 'fasttext.model'
+    ft_path = Path(base_dir) / 'features' / 'fasttext.model'
     if ft_path.exists():
         extractors['fasttext'] = FastText.load(str(ft_path))
 
-    tfidf_path = Path(features_dir) / 'tfidf_vectorizer.pkl'
+    tfidf_path = Path(base_dir) / 'features' / 'tfidf_vectorizer.pkl'
     if tfidf_path.exists():
         with open(tfidf_path, 'rb') as f:
             extractors['tfidf'] = pickle.load(f)
@@ -215,16 +246,11 @@ st.markdown("---")
 
 # Sidebar
 with st.sidebar:
-    st.header("⚙️ Configuration")
-    models_dir = st.text_input("Models Directory", value="web_attack_detection/models")
-    features_dir = st.text_input("Features Directory", value="web_attack_detection/features")
-
-    st.markdown("---")
     st.header("📊 Model Categories")
     show_classical = st.checkbox("Classical ML (9 models)", value=True)
     show_dl = st.checkbox("Deep Learning (5 models)", value=True)
-    show_transformer = st.checkbox("Transformers (2 models)", value=True)
-    show_hybrid = st.checkbox("Hybrid Models (3-5 models)", value=True)
+    show_transformer = st.checkbox("Transformers (2 models)", value=False)
+    show_hybrid = st.checkbox("Hybrid Models (3-5 models)", value=False)
 
     st.markdown("---")
     st.info("💡 Enter a query below to test for SQLi or XSS attacks")
@@ -254,11 +280,11 @@ if analyze_button and user_input:
         processed_text = preprocessor.preprocess(user_input)
 
         try:
-            models, loaded_count = load_models(models_dir)
-            extractors = load_feature_extractors(features_dir)
+            models, loaded_count = load_models()
+            extractors = load_feature_extractors()
 
             if not models:
-                st.error("❌ No models found! Please check the models directory path.")
+                st.error("❌ No models found! Please check the setup.")
                 st.stop()
 
             st.success(f"✅ Loaded {loaded_count} models successfully!")
@@ -454,8 +480,7 @@ elif analyze_button:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666;'>
-    <p>🔬 Advanced Web Attack Detection System | Powered by 17 ML Models</p>
+    <p>🔬 Advanced Web Attack Detection System | Powered by ML Models</p>
     <p>Classical ML • Deep Learning • Transformers • Hybrid Ensembles</p>
 </div>
 """, unsafe_allow_html=True)
-
