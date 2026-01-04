@@ -8,12 +8,13 @@ from tensorflow import keras
 import torch
 from pathlib import Path
 import re
+from gensim.models import Word2Vec, FastText
 from sklearn.feature_extraction.text import TfidfVectorizer
-from huggingface_hub import hf_hub_download
+from transformers import BertTokenizer, BertForSequenceClassification, DistilBertTokenizer, DistilBertForSequenceClassification
 import warnings
 warnings.filterwarnings('ignore')
 
-# SQL and XSS Keywords
+# SQL and XSS Keywords (keep as is)
 SQLKEYWORDS = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER', 'UNION', 
                'WHERE', 'FROM', 'JOIN', 'AND', 'OR', 'NOT', 'NULL', 'ORDER', 'GROUP', 
                'HAVING', 'LIMIT', 'OFFSET', 'AS', 'ON', 'EXEC', 'EXECUTE', 'DECLARE', 
@@ -76,75 +77,115 @@ class ContentMatchingPreprocessor:
         text = self.special_character_mapping(text)
         return text
 
-# Initialize session state
-if 'loaded_models' not in st.session_state:
-    st.session_state.loaded_models = {}
-if 'feature_extractors' not in st.session_state:
-    st.session_state.feature_extractors = {}
+@st.cache_resource
+def load_models(models_dir='web_attack_detection/models'):
+    """Load all trained models from repository"""
+    models = {}
+    loaded_count = 0
+
+    # Classical ML models
+    classical_path = Path(models_dir) / 'classical_ml'
+    if classical_path.exists():
+        for model_file in classical_path.glob('*.pkl'):
+            try:
+                models[model_file.stem] = joblib.load(model_file)
+                loaded_count += 1
+            except Exception as e:
+                st.warning(f"Could not load {model_file.stem}: {str(e)}")
+
+    # Deep Learning models
+    dl_path = Path(models_dir) / 'deep_learning'
+    if dl_path.exists():
+        for model_file in dl_path.glob('*.h5'):
+            try:
+                models[model_file.stem] = keras.models.load_model(model_file)
+                loaded_count += 1
+            except Exception as e:
+                st.warning(f"Could not load {model_file.stem}: {str(e)}")
+
+    # Transformer models
+    transformer_models = ['DistilBERT', 'BERT']
+    for model_name in transformer_models:
+        model_dir = Path(models_dir) / 'transformers' / model_name
+        if model_dir.exists():
+            try:
+                if model_name == 'DistilBERT':
+                    tokenizer = DistilBertTokenizer.from_pretrained(model_dir)
+                    model = DistilBertForSequenceClassification.from_pretrained(model_dir)
+                else:
+                    tokenizer = BertTokenizer.from_pretrained(model_dir)
+                    model = BertForSequenceClassification.from_pretrained(model_dir)
+                models[model_name] = {'model': model, 'tokenizer': tokenizer}
+                loaded_count += 1
+            except Exception as e:
+                st.warning(f"Could not load {model_name}: {str(e)}")
+
+    # Hybrid models
+    hybrid_path = Path(models_dir) / 'hybrid'
+    if hybrid_path.exists():
+        for model_file in hybrid_path.glob('*.pkl'):
+            try:
+                models[model_file.stem] = joblib.load(model_file)
+                loaded_count += 1
+            except Exception as e:
+                st.warning(f"Could not load {model_file.stem}: {str(e)}")
+
+    return models, loaded_count
 
 @st.cache_resource
-def load_single_model(model_name, model_type):
-    """Load a single model on demand from HuggingFace"""
-    repo_id = "Dr-KeK/sqli-xss-models"
-    
-    try:
-        if model_type == "classical":
-            file_path = hf_hub_download(
-                repo_id=repo_id,
-                filename=f"models/classical_ml/{model_name}.pkl",
-                repo_type="model"
-            )
-            return joblib.load(file_path)
-        
-        elif model_type == "deep_learning":
-            file_path = hf_hub_download(
-                repo_id=repo_id,
-                filename=f"models/deep_learning/{model_name}.h5",
-                repo_type="model"
-            )
-            return keras.models.load_model(file_path)
-        
-        elif model_type == "hybrid":
-            file_path = hf_hub_download(
-                repo_id=repo_id,
-                filename=f"models/hybrid/{model_name}.pkl",
-                repo_type="model"
-            )
-            return joblib.load(file_path)
-            
-    except Exception as e:
-        st.error(f"Failed to load {model_name}: {str(e)}")
-        return None
-
-@st.cache_resource
-def load_feature_extractors_lazy():
-    """Load TF-IDF vectorizer"""
-    repo_id = "Dr-KeK/sqli-xss-models"
+def load_feature_extractors(features_dir='web_attack_detection/features'):
+    """Load feature extraction models"""
     extractors = {}
-    
-    try:
-        # Load TF-IDF vectorizer
-        tfidf_path = hf_hub_download(
-            repo_id=repo_id, 
-            filename="features/tfidf_vectorizer.pkl", 
-            repo_type="model"
-        )
+
+    # Word2Vec
+    w2v_path = Path(features_dir) / 'word2vec.model'
+    if w2v_path.exists():
+        extractors['word2vec'] = Word2Vec.load(str(w2v_path))
+
+    # FastText
+    ft_path = Path(features_dir) / 'fasttext.model'
+    if ft_path.exists():
+        extractors['fasttext'] = FastText.load(str(ft_path))
+
+    # TF-IDF Vectorizer - CRITICAL FOR CLASSICAL ML!
+    tfidf_path = Path(features_dir) / 'tfidf_vectorizer.pkl'
+    if tfidf_path.exists():
         with open(tfidf_path, 'rb') as f:
             extractors['tfidf'] = pickle.load(f)
-        st.success("✅ Loaded TF-IDF vectorizer")
-    except Exception as e:
-        st.error(f"❌ Failed to load TF-IDF: {str(e)}")
-    
+    else:
+        st.error("⚠️ TF-IDF vectorizer not found! Classical ML models will fail.")
+
     return extractors
 
-def extract_features(text, extractors):
-    """Extract features using TF-IDF"""
-    if 'tfidf' in extractors:
-        features = extractors['tfidf'].transform([text]).toarray()[0]
-        return features
-    else:
-        st.error("❌ No feature extractors available!")
-        return np.zeros(1000)
+def extract_tfidf_features(text, extractors):
+    """Extract TF-IDF features for classical ML models"""
+    if 'tfidf' not in extractors:
+        st.error("TF-IDF vectorizer not loaded!")
+        return None
+    
+    # Transform single text sample
+    tfidf_features = extractors['tfidf'].transform([text]).toarray()
+    return tfidf_features[0]
+
+def extract_uniembed_features(text, extractors, w2v_dim=50, ft_dim=50):
+    """Extract UniEmbed features for deep learning models"""
+    tokens = text.split()
+
+    # Word2Vec
+    w2v_vectors = []
+    for token in tokens:
+        if 'word2vec' in extractors and token in extractors['word2vec'].wv:
+            w2v_vectors.append(extractors['word2vec'].wv[token])
+    w2v_emb = np.mean(w2v_vectors, axis=0) if w2v_vectors else np.zeros(w2v_dim)
+
+    # FastText
+    ft_vectors = []
+    for token in tokens:
+        if 'fasttext' in extractors:
+            ft_vectors.append(extractors['fasttext'].wv[token])
+    ft_emb = np.mean(ft_vectors, axis=0) if ft_vectors else np.zeros(ft_dim)
+
+    return np.concatenate([w2v_emb, ft_emb])
 
 def prepare_deep_learning_input(features, model_name):
     """Reshape features for deep learning models"""
@@ -161,50 +202,59 @@ def prepare_deep_learning_input(features, model_name):
         return features_truncated.reshape(1, timesteps, features_per_timestep)
     return features.reshape(1, -1)
 
+def predict_with_transformer(text, model_dict, max_length=64):
+    """Predict with transformer model"""
+    model = model_dict['model']
+    tokenizer = model_dict['tokenizer']
+
+    encoding = tokenizer(text, add_special_tokens=True, max_length=max_length,
+                        padding='max_length', truncation=True,
+                        return_attention_mask=True, return_tensors='pt')
+
+    with torch.no_grad():
+        outputs = model(input_ids=encoding['input_ids'],
+                       attention_mask=encoding['attention_mask'])
+        logits = outputs.logits
+        probs = torch.softmax(logits, dim=1)
+        pred = torch.argmax(logits, dim=1).item()
+        confidence = probs[0][pred].item()
+
+    return pred, confidence
+
+# Define which models use which features
+CLASSICAL_ML_MODELS = ['Logistic_Regression', 'SVM', 'Gaussian_Naive_Bayes', 
+                       'Decision_Tree', 'KNN', 'Random_Forest', 'XGBoost', 
+                       'Gradient_Boosting', 'Extra_Trees']
+
+DEEP_LEARNING_MODELS = ['MLP', 'CNN', 'LSTM', 'BiLSTM', 'CNN_LSTM']
+
+TRANSFORMER_MODELS = ['DistilBERT', 'BERT']
+
+HYBRID_MODELS = ['StackingEnsemble', 'SoftVoting', 'HardVoting', 
+                'LightGBM_BiLSTM', 'BERT_XGBoost']
+
 # Streamlit App
 st.set_page_config(page_title="SQLi & XSS Detection System", layout="wide", page_icon="🛡️")
 
 st.title("🛡️ SQL Injection & XSS Attack Detection System")
-st.markdown("### Memory-Optimized Version - Select Models to Use")
+st.markdown("### Powered by 17 Machine Learning Models")
 st.markdown("---")
 
 # Sidebar
 with st.sidebar:
-    st.header("⚙️ Select Models")
-    st.info("💡 Select only models you want to use (saves memory)")
-    
-    st.markdown("#### Classical ML (Small)")
-    classical_models = {
-        'Logistic_Regression': st.checkbox("Logistic Regression", value=True),
-        'Random_Forest': st.checkbox("Random Forest", value=True),
-        'XGBoost': st.checkbox("XGBoost", value=True),
-        'SVM': st.checkbox("SVM"),
-        'Decision_Tree': st.checkbox("Decision Tree"),
-        'KNN': st.checkbox("KNN"),
-        'Gradient_Boosting': st.checkbox("Gradient Boosting"),
-        'Extra_Trees': st.checkbox("Extra Trees"),
-        'Gaussian_Naive_Bayes': st.checkbox("Naive Bayes"),
-    }
-    
-    st.markdown("#### Deep Learning (Large)")
-    dl_models = {
-        'MLP': st.checkbox("MLP", value=False),
-        'CNN': st.checkbox("CNN", value=False),
-        'LSTM': st.checkbox("LSTM", value=False),
-        'BiLSTM': st.checkbox("BiLSTM", value=False),
-        'CNN_LSTM': st.checkbox("CNN-LSTM", value=False),
-    }
-    
-    st.markdown("#### Hybrid (Medium)")
-    hybrid_models = {
-        'StackingEnsemble': st.checkbox("Stacking Ensemble", value=False),
-        'SoftVoting': st.checkbox("Soft Voting", value=False),
-        'HardVoting': st.checkbox("Hard Voting", value=False),
-    }
-    
+    st.header("⚙️ Configuration")
+    models_dir = st.text_input("Models Directory", value="web_attack_detection/models")
+    features_dir = st.text_input("Features Directory", value="web_attack_detection/features")
+
     st.markdown("---")
-    selected_count = sum(classical_models.values()) + sum(dl_models.values()) + sum(hybrid_models.values())
-    st.metric("Selected Models", selected_count)
+    st.header("📊 Model Categories")
+    show_classical = st.checkbox("Classical ML (9 models)", value=True)
+    show_dl = st.checkbox("Deep Learning (5 models)", value=True)
+    show_transformer = st.checkbox("Transformers (2 models)", value=True)
+    show_hybrid = st.checkbox("Hybrid Models (3-5 models)", value=True)
+
+    st.markdown("---")
+    st.info("💡 Enter a query below to test for SQLi or XSS attacks")
 
 # Main content
 col1, col2 = st.columns([2, 1])
@@ -226,29 +276,23 @@ with col2:
     st.caption("SQL Comment Injection")
 
 if analyze_button and user_input:
-    if selected_count == 0:
-        st.warning("⚠️ Please select at least one model from the sidebar!")
-        st.stop()
-    
-    with st.spinner("🔄 Loading features and analyzing..."):
+    with st.spinner("🔄 Loading models and analyzing..."):
         preprocessor = ContentMatchingPreprocessor()
         processed_text = preprocessor.preprocess(user_input)
 
         try:
-            # Load feature extractors
-            if not st.session_state.feature_extractors:
-                with st.spinner("📥 Loading TF-IDF vectorizer..."):
-                    st.session_state.feature_extractors = load_feature_extractors_lazy()
-            
-            extractors = st.session_state.feature_extractors
-            
-            if not extractors:
-                st.error("❌ Failed to load feature extractors!")
+            models, loaded_count = load_models(models_dir)
+            extractors = load_feature_extractors(features_dir)
+
+            if not models:
+                st.error("❌ No models found! Please check the models directory path.")
                 st.stop()
-            
-            # Extract features
-            features = extract_features(processed_text, extractors)
-            st.info(f"📊 Feature vector size: {features.shape[0]} dimensions")
+
+            st.success(f"✅ Loaded {loaded_count} models successfully!")
+
+            # Extract BOTH feature types
+            tfidf_features = extract_tfidf_features(processed_text, extractors)
+            uniembed_features = extract_uniembed_features(processed_text, extractors)
 
             with st.expander("🔍 Preprocessed Text"):
                 col_a, col_b = st.columns(2)
@@ -264,122 +308,139 @@ if analyze_button and user_input:
 
             results = []
 
-            # Classical ML Models
-            selected_classical = [k for k, v in classical_models.items() if v]
-            if selected_classical:
+            # Classical ML Models - USE TF-IDF FEATURES!
+            if show_classical and tfidf_features is not None:
                 st.subheader("🔹 Classical Machine Learning Models")
-                classical_cols = st.columns(min(3, len(selected_classical)))
-                
-                for idx, model_name in enumerate(selected_classical):
-                    with st.spinner(f"Loading {model_name}..."):
-                        if model_name not in st.session_state.loaded_models:
-                            model = load_single_model(model_name, "classical")
-                            if model:
-                                st.session_state.loaded_models[model_name] = model
-                        
-                        if model_name in st.session_state.loaded_models:
-                            try:
-                                model = st.session_state.loaded_models[model_name]
-                                pred = model.predict(features.reshape(1, -1))[0]
-                                if hasattr(model, 'predict_proba'):
-                                    proba = model.predict_proba(features.reshape(1, -1))[0]
-                                    confidence = proba[pred] * 100
-                                else:
-                                    confidence = 100 if pred == 1 else 0
+                classical_cols = st.columns(3)
+                col_idx = 0
 
-                                label = "🚨 ATTACK" if pred == 1 else "✅ SAFE"
+                for model_name in CLASSICAL_ML_MODELS:
+                    if model_name in models:
+                        try:
+                            model = models[model_name]
+                            # USE TF-IDF FEATURES HERE!
+                            pred = model.predict(tfidf_features.reshape(1, -1))[0]
+                            if hasattr(model, 'predict_proba'):
+                                proba = model.predict_proba(tfidf_features.reshape(1, -1))[0]
+                                confidence = proba[pred] * 100
+                            else:
+                                confidence = 100 if pred == 1 else 0
 
-                                with classical_cols[idx % 3]:
-                                    st.metric(label=model_name.replace('_', ' '), value=label,
-                                            delta=f"{confidence:.1f}% confidence")
+                            label = "🚨 ATTACK" if pred == 1 else "✅ SAFE"
 
-                                results.append({
-                                    'Model': model_name.replace('_', ' '),
-                                    'Category': 'Classical ML',
-                                    'Prediction': label,
-                                    'Confidence': f'{confidence:.1f}%'
-                                })
-                            except Exception as e:
-                                st.warning(f"⚠️ {model_name}: {str(e)}")
+                            with classical_cols[col_idx % 3]:
+                                st.metric(label=model_name.replace('_', ' '), value=label,
+                                        delta=f"{confidence:.1f}% confidence")
 
-            # Deep Learning Models
-            selected_dl = [k for k, v in dl_models.items() if v]
-            if selected_dl:
+                            results.append({
+                                'Model': model_name.replace('_', ' '),
+                                'Category': 'Classical ML',
+                                'Prediction': label,
+                                'Confidence': f'{confidence:.1f}%'
+                            })
+                            col_idx += 1
+                        except Exception as e:
+                            st.warning(f"⚠️ {model_name}: {str(e)}")
+
+            # Deep Learning Models - USE UNIEMBED FEATURES!
+            if show_dl and uniembed_features is not None:
                 st.subheader("🔹 Deep Learning Models")
-                dl_cols = st.columns(min(3, len(selected_dl)))
-                
-                for idx, model_name in enumerate(selected_dl):
-                    with st.spinner(f"Loading {model_name}..."):
-                        if model_name not in st.session_state.loaded_models:
-                            model = load_single_model(model_name, "deep_learning")
-                            if model:
-                                st.session_state.loaded_models[model_name] = model
-                        
-                        if model_name in st.session_state.loaded_models:
-                            try:
-                                model = st.session_state.loaded_models[model_name]
-                                input_data = prepare_deep_learning_input(features, model_name)
-                                proba = model.predict(input_data, verbose=0)[0][0]
-                                pred = 1 if proba > 0.5 else 0
-                                confidence = proba * 100 if pred == 1 else (1 - proba) * 100
+                dl_cols = st.columns(3)
+                col_idx = 0
 
-                                label = "🚨 ATTACK" if pred == 1 else "✅ SAFE"
+                for model_name in DEEP_LEARNING_MODELS:
+                    if model_name in models:
+                        try:
+                            model = models[model_name]
+                            # USE UNIEMBED FEATURES HERE!
+                            input_data = prepare_deep_learning_input(uniembed_features, model_name)
+                            proba = model.predict(input_data, verbose=0)[0][0]
+                            pred = 1 if proba > 0.5 else 0
+                            confidence = proba * 100 if pred == 1 else (1 - proba) * 100
 
-                                with dl_cols[idx % 3]:
-                                    st.metric(label=model_name, value=label,
-                                            delta=f"{confidence:.1f}% confidence")
+                            label = "🚨 ATTACK" if pred == 1 else "✅ SAFE"
 
-                                results.append({
-                                    'Model': model_name,
-                                    'Category': 'Deep Learning',
-                                    'Prediction': label,
-                                    'Confidence': f'{confidence:.1f}%'
-                                })
-                            except Exception as e:
-                                st.warning(f"⚠️ {model_name}: {str(e)}")
+                            with dl_cols[col_idx % 3]:
+                                st.metric(label=model_name, value=label,
+                                        delta=f"{confidence:.1f}% confidence")
 
-            # Hybrid Models
-            selected_hybrid = [k for k, v in hybrid_models.items() if v]
-            if selected_hybrid:
+                            results.append({
+                                'Model': model_name,
+                                'Category': 'Deep Learning',
+                                'Prediction': label,
+                                'Confidence': f'{confidence:.1f}%'
+                            })
+                            col_idx += 1
+                        except Exception as e:
+                            st.warning(f"⚠️ {model_name}: {str(e)}")
+
+            # Transformer Models - USE RAW TEXT!
+            if show_transformer:
+                st.subheader("🔹 Transformer Models")
+                trans_cols = st.columns(2)
+                col_idx = 0
+
+                for model_name in TRANSFORMER_MODELS:
+                    if model_name in models:
+                        try:
+                            # USE ORIGINAL RAW TEXT HERE!
+                            pred, confidence = predict_with_transformer(user_input, models[model_name])
+                            confidence = confidence * 100
+
+                            label = "🚨 ATTACK" if pred == 1 else "✅ SAFE"
+
+                            with trans_cols[col_idx % 2]:
+                                st.metric(label=model_name, value=label,
+                                        delta=f"{confidence:.1f}% confidence")
+
+                            results.append({
+                                'Model': model_name,
+                                'Category': 'Transformer',
+                                'Prediction': label,
+                                'Confidence': f'{confidence:.1f}%'
+                            })
+                            col_idx += 1
+                        except Exception as e:
+                            st.warning(f"⚠️ {model_name}: {str(e)}")
+
+            # Hybrid Models - USE UNIEMBED FEATURES (or check metadata)
+            if show_hybrid and uniembed_features is not None:
                 st.subheader("🔹 Hybrid Ensemble Models")
-                hybrid_cols = st.columns(min(3, len(selected_hybrid)))
-                
-                for idx, model_name in enumerate(selected_hybrid):
-                    with st.spinner(f"Loading {model_name}..."):
-                        if model_name not in st.session_state.loaded_models:
-                            model = load_single_model(model_name, "hybrid")
-                            if model:
-                                st.session_state.loaded_models[model_name] = model
-                        
-                        if model_name in st.session_state.loaded_models:
-                            try:
-                                model = st.session_state.loaded_models[model_name]
-                                pred = model.predict(features.reshape(1, -1))[0]
-                                if hasattr(model, 'predict_proba'):
-                                    proba = model.predict_proba(features.reshape(1, -1))[0]
-                                    confidence = proba[pred] * 100
-                                else:
-                                    confidence = 100 if pred == 1 else 0
+                hybrid_cols = st.columns(3)
+                col_idx = 0
 
-                                label = "🚨 ATTACK" if pred == 1 else "✅ SAFE"
+                for model_name in HYBRID_MODELS:
+                    if model_name in models:
+                        try:
+                            model = models[model_name]
+                            pred = model.predict(uniembed_features.reshape(1, -1))[0]
+                            if hasattr(model, 'predict_proba'):
+                                proba = model.predict_proba(uniembed_features.reshape(1, -1))[0]
+                                confidence = proba[pred] * 100
+                            else:
+                                confidence = 100 if pred == 1 else 0
 
-                                with hybrid_cols[idx % 3]:
-                                    st.metric(label=model_name, value=label,
-                                            delta=f"{confidence:.1f}% confidence")
+                            label = "🚨 ATTACK" if pred == 1 else "✅ SAFE"
 
-                                results.append({
-                                    'Model': model_name,
-                                    'Category': 'Hybrid',
-                                    'Prediction': label,
-                                    'Confidence': f'{confidence:.1f}%'
-                                })
-                            except Exception as e:
-                                st.warning(f"⚠️ {model_name}: {str(e)}")
+                            with hybrid_cols[col_idx % 3]:
+                                st.metric(label=model_name, value=label,
+                                        delta=f"{confidence:.1f}% confidence")
+
+                            results.append({
+                                'Model': model_name,
+                                'Category': 'Hybrid',
+                                'Prediction': label,
+                                'Confidence': f'{confidence:.1f}%'
+                            })
+                            col_idx += 1
+                        except Exception as e:
+                            st.warning(f"⚠️ {model_name}: {str(e)}")
 
             # Summary
+            st.markdown("---")
+            st.header("📊 Summary")
+
             if results:
-                st.markdown("---")
-                st.header("📊 Summary")
                 df_results = pd.DataFrame(results)
 
                 attack_count = sum(1 for r in results if "ATTACK" in r['Prediction'])
@@ -387,7 +448,7 @@ if analyze_button and user_input:
 
                 col_s1, col_s2, col_s3 = st.columns(3)
                 with col_s1:
-                    st.metric("Models Used", len(results))
+                    st.metric("Total Models", len(results))
                 with col_s2:
                     st.metric("Attack Detected", attack_count, 
                              delta=f"{attack_count/len(results)*100:.1f}%")
@@ -416,7 +477,7 @@ elif analyze_button:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666;'>
-    <p>🔬 Advanced Web Attack Detection System | Memory-Optimized Version</p>
-    <p>Models load on-demand from HuggingFace • TF-IDF Feature Extraction</p>
+    <p>🔬 Advanced Web Attack Detection System | Powered by 17 ML Models</p>
+    <p>Classical ML • Deep Learning • Transformers • Hybrid Ensembles</p>
 </div>
 """, unsafe_allow_html=True)
