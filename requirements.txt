@@ -5,7 +5,12 @@ scikit-learn
 tensorflow
 torch
 transformers
-gensim
 xgboost
-lightgbm
+gensim
 joblib
+matplotlib
+seaborn
+plotly
+torch-geometric
+torch-scatter
+torch-sparse
