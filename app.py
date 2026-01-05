@@ -12,7 +12,6 @@ from gensim.models import Word2Vec, FastText
 from sklearn.feature_extraction.text import TfidfVectorizer
 from huggingface_hub import hf_hub_download
 
-# ✅ FIXED: Use Auto classes (compatible with all transformers versions)
 try:
     from transformers import (
         AutoTokenizer, 
@@ -40,9 +39,7 @@ XSSKEYWORDS = ['script', 'iframe', 'object', 'embed', 'applet', 'meta', 'link', 
                'sessionstorage']
 
 class ContentMatchingPreprocessor:
-    """
-    FIXED: Preprocess text input with correct ordering
-    """
+    """Preprocess text input with token-based transformations"""
     def __init__(self):
         self.sqlkeywords = set([kw.lower() for kw in SQLKEYWORDS])
         self.xsskeywords = set([kw.lower() for kw in XSSKEYWORDS])
@@ -57,7 +54,7 @@ class ContentMatchingPreprocessor:
         return re.sub(url_pattern, 'URL', text)
 
     def preserve_keywords(self, text):
-        """Preserve SQL and XSS keywords as atomic units - BEFORE lowercasing!"""
+        """Preserve SQL and XSS keywords as atomic units"""
         for keyword in self.sqlkeywords:
             pattern = re.compile(r'\b' + re.escape(keyword) + r'\b', re.IGNORECASE)
             text = pattern.sub(f'SQL_{keyword.upper()}', text)
@@ -73,7 +70,7 @@ class ContentMatchingPreprocessor:
         return text.strip()
 
     def special_character_mapping(self, text):
-        """Map special characters to tokens - ORDER MATTERS!"""
+        """Map special characters to tokens"""
         char_mappings = [
             ('--', ' COMMENT '),
             ('/*', ' BLOCKCOMMENT_START '),
@@ -96,7 +93,7 @@ class ContentMatchingPreprocessor:
         return text
 
     def preprocess(self, text):
-        """Complete preprocessing pipeline - CORRECT ORDER"""
+        """Complete preprocessing pipeline"""
         if not isinstance(text, str):
             text = str(text)
 
@@ -113,6 +110,14 @@ if 'loaded_models' not in st.session_state:
     st.session_state.loaded_models = {}
 if 'feature_extractors' not in st.session_state:
     st.session_state.feature_extractors = {}
+
+def clear_model_cache():
+    """Clear all loaded models and feature extractors from memory"""
+    st.session_state.loaded_models = {}
+    st.session_state.feature_extractors = {}
+    st.cache_resource.clear()
+    st.cache_data.clear()
+    return True
 
 @st.cache_resource
 def load_single_model(model_name, model_type):
@@ -137,7 +142,6 @@ def load_single_model(model_name, model_type):
             return keras.models.load_model(file_path)
 
         elif model_type == "transformer":
-            # ✅ FIXED: Use Auto classes for compatibility
             try:
                 tokenizer = AutoTokenizer.from_pretrained(
                     repo_id, 
@@ -150,7 +154,6 @@ def load_single_model(model_name, model_type):
                 return {'model': model, 'tokenizer': tokenizer}
             except Exception as e:
                 st.warning(f"Failed to load {model_name} from custom path: {e}")
-                # Fallback: try loading from model name directly
                 if model_name == 'DistilBERT':
                     model_id = 'distilbert-base-uncased'
                 else:
@@ -173,7 +176,7 @@ def load_single_model(model_name, model_type):
 
 @st.cache_resource
 def load_feature_extractors_lazy():
-    """Load TF-IDF AND Word2Vec/FastText for proper feature extraction"""
+    """Load TF-IDF and Word2Vec/FastText for feature extraction"""
     repo_id = "Dr-KeK/sqli-xss-models"
     extractors = {}
 
@@ -266,7 +269,7 @@ def prepare_deep_learning_input(features, model_name):
     return features.reshape(1, -1)
 
 def predict_with_transformer(text, model_dict, max_length=64):
-    """Predict with transformer model (uses RAW text)"""
+    """Predict with transformer model"""
     model = model_dict['model']
     tokenizer = model_dict['tokenizer']
 
@@ -285,15 +288,14 @@ def predict_with_transformer(text, model_dict, max_length=64):
     return pred, confidence
 
 # Streamlit App
-st.set_page_config(page_title="SQLi & XSS Detection System", layout="wide", page_icon="🛡️")
+st.set_page_config(page_title="SQLi & XSS Detection", layout="wide", page_icon="🛡️")
 
 st.title("🛡️ SQL Injection & XSS Attack Detection System")
-st.markdown("### FIXED VERSION - Compatible with All Transformers Versions")
 st.markdown("---")
 
 # Sidebar
 with st.sidebar:
-    st.header("⚙️ Select Models")
+    st.header("⚙️ Model Selection")
     st.info("ℹ️ Classical ML uses TF-IDF | Deep Learning & Hybrid use UniEmbed")
 
     st.markdown("#### Classical ML (TF-IDF)")
@@ -341,6 +343,24 @@ with st.sidebar:
         st.warning(f"⚠️ {selected_count} models selected.")
     else:
         st.metric("Selected Models", selected_count)
+
+    st.markdown("---")
+    st.markdown("#### 🗑️ Memory Management")
+
+    # Calculate memory usage
+    models_loaded = len(st.session_state.loaded_models)
+    extractors_loaded = len(st.session_state.feature_extractors)
+
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        st.metric("Models Loaded", models_loaded)
+    with col_m2:
+        st.metric("Extractors", extractors_loaded)
+
+    if st.button("🗑️ Clear All Cache", type="secondary", use_container_width=True):
+        if clear_model_cache():
+            st.success("✅ Cache cleared!")
+            st.rerun()
 
 # Main content
 col1, col2 = st.columns([2, 1])
@@ -428,10 +448,10 @@ if analyze_button and user_input:
 
             results = []
 
-            # Classical ML Models - USE TF-IDF
+            # Classical ML Models
             selected_classical = [k for k, v in classical_models.items() if v]
             if selected_classical and tfidf_features is not None:
-                st.subheader("🔹 Classical Machine Learning Models (TF-IDF)")
+                st.subheader("🔹 Classical Machine Learning Models")
                 classical_cols = st.columns(min(3, len(selected_classical)))
 
                 for idx, model_name in enumerate(selected_classical):
@@ -466,10 +486,10 @@ if analyze_button and user_input:
                         except Exception as e:
                             st.warning(f"⚠️ {model_name}: {str(e)}")
 
-            # Deep Learning Models - USE UNIEMBED
+            # Deep Learning Models
             selected_dl = [k for k, v in dl_models.items() if v]
             if selected_dl and uniembed_features is not None:
-                st.subheader("🔹 Deep Learning Models (UniEmbed)")
+                st.subheader("🔹 Deep Learning Models")
                 dl_cols = st.columns(min(3, len(selected_dl)))
 
                 for idx, model_name in enumerate(selected_dl):
@@ -502,10 +522,10 @@ if analyze_button and user_input:
                         except Exception as e:
                             st.warning(f"⚠️ {model_name}: {str(e)}")
 
-            # Transformer Models - USE RAW TEXT
+            # Transformer Models
             selected_transformers = [k for k, v in transformer_models.items() if v]
             if selected_transformers:
-                st.subheader("🔹 Transformer Models (Raw Text)")
+                st.subheader("🔹 Transformer Models")
                 trans_cols = st.columns(min(2, len(selected_transformers)))
 
                 for idx, model_name in enumerate(selected_transformers):
@@ -535,10 +555,10 @@ if analyze_button and user_input:
                         except Exception as e:
                             st.warning(f"⚠️ {model_name}: {str(e)}")
 
-            # Hybrid Models - USE UNIEMBED
+            # Hybrid Models
             selected_hybrid = [k for k, v in hybrid_models.items() if v]
             if selected_hybrid and uniembed_features is not None:
-                st.subheader("🔹 Hybrid Ensemble Models (UniEmbed)")
+                st.subheader("🔹 Hybrid Ensemble Models")
                 hybrid_cols = st.columns(min(3, len(selected_hybrid)))
 
                 for idx, model_name in enumerate(selected_hybrid):
@@ -611,9 +631,4 @@ elif analyze_button:
 
 # Footer
 st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: #666;'>
-<p>🔬 Advanced Web Attack Detection System | FIXED VERSION v2</p>
-<p>✅ Compatible with All Transformers Versions</p>
-</div>
-""", unsafe_allow_html=True)
+st.caption("🔬 Advanced Web Attack Detection System | Powered by HuggingFace Hub")
